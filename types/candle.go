@@ -1,6 +1,6 @@
 package types
 
-//	type Candle struct {
+//	type CandleEntry struct {
 //		O  string // open
 //		H  string // high
 //		L  string // low
@@ -9,9 +9,9 @@ package types
 //		Ts int64  // timestamp start
 //		Te int64  // timestamp end
 //	}
-type Candle map[string]any
+type CandleEntry map[string]any
 
-func (c *Candle) FromList(data []any, keys []string) {
+func (c *CandleEntry) FromList(data []any, keys []string) {
 	var m = make(map[string]any)
 	if len(data) != len(keys) {
 		return
@@ -20,4 +20,9 @@ func (c *Candle) FromList(data []any, keys []string) {
 		m[key] = data[i]
 	}
 	*c = m
+}
+
+type DepthEntry struct {
+	Asks [][]string
+	Bids [][]string
 }

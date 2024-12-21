@@ -6,7 +6,6 @@ import (
 	"github.com/xavierzho/go-cexs/types"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 type BalanceResponse struct {
@@ -17,48 +16,21 @@ type BalanceResponse struct {
 	Frozen    string `json:"frozen"`
 }
 
-func (c *Connector) Balance(symbols []string) (map[string]types.UnifiedBalance, error) {
+func (c *Connector) Balance(symbols []string) (map[string]types.BalanceEntry, error) {
 	var response struct {
 		Wallet []BalanceResponse
 	}
-	err := c.Call(http.MethodGet, "spot/v1/wallet", map[string]interface{}{}, constants.Keyed, &response)
+	err := c.Call(http.MethodGet, BalanceEndpoint, map[string]interface{}{}, constants.Keyed, &response)
 	if err != nil {
 		return nil, err
 	}
-	var result = make(map[string]types.UnifiedBalance, len(symbols))
+	var result = make(map[string]types.BalanceEntry, len(symbols))
 	for _, balance := range response.Wallet {
-		result[balance.ID] = types.UnifiedBalance{
+		result[balance.ID] = types.BalanceEntry{
 			Currency: balance.ID,
 			Free:     balance.Available,
 			Locked:   balance.Frozen,
 		}
-	}
-	return result, nil
-}
-
-func (c *Connector) PendingOrders(symbol string) ([]types.UnifiedOpenOrder, error) {
-	var response []OrderStatusResponse
-	err := c.Call(http.MethodPost, "spot/v4/query/open-orders", map[string]interface{}{
-		"symbol": symbol,
-	}, constants.Signed, &response)
-	if err != nil {
-		return nil, err
-	}
-	var result = make([]types.UnifiedOpenOrder, 0, len(response))
-
-	for _, order := range response {
-		price, _ := decimal.NewFromString(order.Price)
-		amount, _ := decimal.NewFromString(order.Size)
-		result = append(result, types.UnifiedOpenOrder{
-			OrderId:  order.OrderID,
-			TradeNo:  order.ClientOrderID,
-			Symbol:   order.Symbol,
-			Side:     strings.ToUpper(order.Side),
-			Type:     OrderType(order.Type).Convert(),
-			Price:    price,
-			Quantity: amount,
-			Status:   OrderStatus(order.State).Convert(),
-		})
 	}
 	return result, nil
 }
@@ -72,12 +44,12 @@ type OrderBookResponse struct {
 	Price     string     `json:"price"`  // The price at current depth
 }
 
-func (c *Connector) OrderBook(symbol string, limit *int64) (*types.UnifiedOrderBook, error) {
+func (c *Connector) GetOrderBook(symbol string, limit *int64) (*types.OrderBookEntry, error) {
 	var response OrderBookResponse
 	if limit == nil {
 		*limit = 30
 	}
-	err := c.Call(http.MethodGet, "spot/quotation/v3/books", map[string]interface{}{
+	err := c.Call(http.MethodGet, OrderBookEndpoint, map[string]interface{}{
 		"symbol": symbol,
 		"limit":  limit,
 	}, constants.None, &response)
@@ -88,10 +60,71 @@ func (c *Connector) OrderBook(symbol string, limit *int64) (*types.UnifiedOrderB
 	if err != nil {
 		return nil, err
 	}
-	return &types.UnifiedOrderBook{
+	return &types.OrderBookEntry{
 		Symbol:    symbol,
 		Asks:      response.Asks,
 		Bids:      response.Bids,
 		Timestamp: ts,
+	}, nil
+}
+
+func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.CandleEntry, error) {
+	var resp [][]any
+	err := c.Call(http.MethodGet, KlineEndpoint, map[string]interface{}{
+		"symbol": symbol,
+		"step":   interval,
+		"limit":  limit,
+	}, constants.None, &resp)
+	if err != nil {
+		return nil, err
+	}
+	var keys = []string{
+		"time_start", "open", "high", "low", "close", "volume", "volume_usd",
+	}
+	var result []types.CandleEntry
+	for _, kline := range resp {
+		var candle = new(types.CandleEntry)
+		candle.FromList(kline, keys)
+		result = append(result, *candle)
+	}
+	return result, nil
+}
+
+func (c *Connector) GetServerTime() (int64, error) {
+	var resp = new(struct {
+		ServerTime int64 `json:"server_time"`
+	})
+	err := c.Call(http.MethodGet, ServerTimeEndpoint, map[string]interface{}{}, constants.None, resp)
+	return resp.ServerTime, err
+}
+
+type TickerResp struct {
+	Symbol      string `json:"symbol"`
+	AskSz       string `json:"ask_sz"`
+	AskPx       string `json:"ask_px"`
+	Last        string `json:"last"`
+	Qv24h       string `json:"qv_24h"`
+	V24h        string `json:"v_24h"`
+	High24h     string `json:"high_24h"`
+	Low24h      string `json:"low_24h"`
+	BidSz       string `json:"bid_sz"`
+	BidPx       string `json:"bid_px"`
+	Fluctuation string `json:"fluctuation"`
+	Open24h     string `json:"open_24h"`
+	Ts          string `json:"ts"`
+}
+
+func (c *Connector) GetTicker(symbol string) (types.TickerEntry, error) {
+	var resp = new(TickerResp)
+	err := c.Call(http.MethodGet, TickerEndpoint, map[string]interface{}{
+		"symbol": symbol,
+	}, constants.None, resp)
+	if err != nil {
+		return types.TickerEntry{}, err
+	}
+	price, _ := decimal.NewFromString(resp.Last)
+	return types.TickerEntry{
+		Symbol: symbol,
+		Price:  price,
 	}, nil
 }

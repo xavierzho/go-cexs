@@ -1,4 +1,4 @@
-package cexconns
+package platforms
 
 import (
 	"github.com/xavierzho/go-cexs/constants"
@@ -18,29 +18,30 @@ type Caller interface {
 		authType constants.AuthType, returnType interface{}) error
 }
 type Connector interface {
-	Auth
+	Caller
 	Name() constants.Platform
-
-	SpotConnector
+	SymbolPattern(symbol string) string
+	Trade
+	MarketData
 }
 
-type MarketConnector interface {
-	OrderBook(symbol string, depth *int64) (*types.UnifiedOrderBook, error)
-	Candles(symbol, interval string, limit int64) ([]types.Candle, error)
-	ServerTime() (int64, error)
+type MarketData interface {
+	GetOrderBook(symbol string, depth *int64) (*types.OrderBookEntry, error)
+	GetCandles(symbol, interval string, limit int64) ([]types.CandleEntry, error)
+	GetServerTime() (int64, error)
+	GetTicker(symbol string) (types.TickerEntry, error)
 }
-type SpotConnector interface {
-	PlaceOrder(params types.UnifiedOrder) (string, error)
-	BatchOrder(orders []types.UnifiedOrder) ([]string, error)
-	GetOrderStatus(symbol string, orderId string) (*constants.OrderStatus, error)
+type Trade interface {
+	PlaceOrder(params types.OrderEntry) (string, error)
+	BatchOrder(orders []types.OrderEntry) ([]string, error)
+	GetOrderStatus(symbol string, orderId string) (constants.OrderStatus, error)
 
 	Cancel(symbol, orderId string) (bool, error)
 	CancelAll(symbol string) error
 	CancelByIds(symbol string, orderIds []string) (map[string]bool, error)
 
-	Balance(symbols []string) (map[string]types.UnifiedBalance, error)
-	OrderBook(symbol string, depth *int64) (*types.UnifiedOrderBook, error)
-	PendingOrders(symbol string) ([]types.UnifiedOpenOrder, error)
+	Balance(symbols []string) (map[string]types.BalanceEntry, error)
+	PendingOrders(symbol string) ([]types.OpenOrderEntry, error)
 }
 
 type Credentials struct {
@@ -54,14 +55,5 @@ func NewCredentials(apikey, apiSecret string, option *string) *Credentials {
 		APIKey:    apikey,
 		APISecret: apiSecret,
 		Option:    option,
-	}
-}
-
-func Exchange(ex string, apikey, apiSecret string, option *string) Connector {
-	switch constants.Platform(ex) {
-	//case constants.Bitmart:
-	//return bitmart.NewConnector(NewCredentials(apikey, apiSecret, option), &http.Client{})
-	default:
-		return nil
 	}
 }

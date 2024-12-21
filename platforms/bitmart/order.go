@@ -1,6 +1,7 @@
 package bitmart
 
 import (
+	"github.com/shopspring/decimal"
 	"github.com/xavierzho/go-cexs/constants"
 	"github.com/xavierzho/go-cexs/types"
 	"log"
@@ -26,7 +27,7 @@ func (c *Connector) MatchOrderType(state constants.OrderType) types.OrderTypeCon
 		return OrderTypeMarket
 	}
 }
-func (c *Connector) PlaceOrder(order types.UnifiedOrder) (string, error) {
+func (c *Connector) PlaceOrder(order types.OrderEntry) (string, error) {
 	params := map[string]any{
 		"symbol":        order.Symbol,
 		"side":          strings.ToLower(order.Side),
@@ -38,7 +39,7 @@ func (c *Connector) PlaceOrder(order types.UnifiedOrder) (string, error) {
 		"notional":      "",
 	}
 	var response OrderResponse
-	err := c.Call(http.MethodPost, "spot/v2/submit_order", params, constants.Signed, &response)
+	err := c.Call(http.MethodPost, NewOrderEndpoint, params, constants.Signed, &response)
 	if err != nil {
 		return "", err
 	}
@@ -54,7 +55,7 @@ type BatchResponse struct {
 	} `json:"data"`
 }
 
-func (c *Connector) BatchOrder(params []types.UnifiedOrder) ([]string, error) {
+func (c *Connector) BatchOrder(params []types.OrderEntry) ([]string, error) {
 	// Prepare orders
 	orders := make([]map[string]interface{}, len(params))
 	for i, arg := range params {
@@ -87,7 +88,7 @@ func (c *Connector) BatchOrder(params []types.UnifiedOrder) ([]string, error) {
 				"orderParams": batchOrders,
 			}
 			var response BatchResponse
-			err := c.Call("POST", "spot/v4/batch_orders", params, constants.Signed, &response)
+			err := c.Call(http.MethodPost, BatchOrderEndpoint, params, constants.Signed, &response)
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
@@ -123,15 +124,42 @@ type OrderStatusResponse struct {
 	State          string `json:"state"`
 }
 
-func (c *Connector) GetOrderStatus(_ string, orderId string) (*constants.OrderStatus, error) {
+func (c *Connector) GetOrderStatus(_ string, orderId string) (constants.OrderStatus, error) {
 	var response OrderStatusResponse
-	err := c.Call(http.MethodPost, "spot/v4/query/order", map[string]interface{}{
+	err := c.Call(http.MethodPost, QueryOrderEndpoint, map[string]interface{}{
 		"order_id": orderId,
+	}, constants.Signed, &response)
+	if err != nil {
+		return constants.Error, err
+	}
+
+	var state = OrderStatus(response.State).Convert()
+	return state, nil
+}
+
+func (c *Connector) PendingOrders(symbol string) ([]types.OpenOrderEntry, error) {
+	var response []OrderStatusResponse
+	err := c.Call(http.MethodPost, OpenOrdersEndpoint, map[string]interface{}{
+		"symbol": symbol,
 	}, constants.Signed, &response)
 	if err != nil {
 		return nil, err
 	}
+	var result = make([]types.OpenOrderEntry, 0, len(response))
 
-	var state = OrderStatus(response.State).Convert()
-	return &state, nil
+	for _, order := range response {
+		price, _ := decimal.NewFromString(order.Price)
+		amount, _ := decimal.NewFromString(order.Size)
+		result = append(result, types.OpenOrderEntry{
+			OrderId:  order.OrderID,
+			TradeNo:  order.ClientOrderID,
+			Symbol:   order.Symbol,
+			Side:     strings.ToUpper(order.Side),
+			Type:     OrderType(order.Type).Convert(),
+			Price:    price,
+			Quantity: amount,
+			Status:   OrderStatus(order.State).Convert(),
+		})
+	}
+	return result, nil
 }

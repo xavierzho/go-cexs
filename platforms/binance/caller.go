@@ -1,7 +1,6 @@
 package binance
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -42,7 +41,10 @@ func (c *Connector) Call(method string, route string, params map[string]any, aut
 	params[TimeFiled] = time.Now().UnixMilli()
 	encoded := EncodeParams(params)
 	var fullUrl = fmt.Sprintf("%s%s?%s", RestAPI, route, encoded)
-
+	symbol, ok := params[SymbolFiled]
+	if ok {
+		params[SymbolFiled] = c.SymbolPattern(symbol.(string))
+	}
 	switch authType {
 	case constants.Keyed:
 		headers.Add(HeaderAPIKEY, c.APIKey)
@@ -67,22 +69,16 @@ func (c *Connector) Call(method string, route string, params map[string]any, aut
 	if err != nil {
 		return err
 	}
-	var response = new(bytes.Buffer)
 
-	if _, err := io.Copy(response, resp.Body); err != nil {
-		return err
-	}
-
-	fmt.Printf("response(%d) %s\n", resp.StatusCode, response.String())
-	//errCode := utils.Json.Get(response.Bytes(), "code").ToInt()
+	decoder := utils.Json.NewDecoder(resp.Body)
 	if resp.StatusCode != http.StatusOK {
 		var errResp ErrorResponse
-		err := utils.Json.Unmarshal(response.Bytes(), &errResp)
+		err := decoder.Decode(&errResp)
 		if err != nil {
 			return err
 		}
 		return fmt.Errorf("binance request error(%d)[%s]", errResp.Code, errResp.Msg)
 	}
 
-	return utils.Json.Unmarshal(response.Bytes(), &returnType)
+	return decoder.Decode(&returnType)
 }

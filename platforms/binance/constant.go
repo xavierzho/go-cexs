@@ -85,12 +85,13 @@ func (ot OrderType) Convert() constants.OrderType {
 }
 
 const (
-	OrderEndpoint      = "/api/v3/order"
-	OpenOrdersEndpoint = "/api/v3/openOrders"
-	DepthEndpoint      = "/api/v3/depth"
-	AccountEndpoint    = "/api/v3/account"
-	ServerTimeEndpoint = "/api/v3/time"
-	KlineEndpoint      = "/api/v3/klines"
+	OrderEndpoint       = "/api/v3/order"
+	OpenOrdersEndpoint  = "/api/v3/openOrders"
+	DepthEndpoint       = "/api/v3/depth"
+	AccountEndpoint     = "/api/v3/account"
+	ServerTimeEndpoint  = "/api/v3/time"
+	KlineEndpoint       = "/api/v3/klines"
+	PriceTickerEndpoint = "/api/v3/ticker/price"
 )
 
 type NewOrderRespType string
@@ -121,3 +122,12 @@ const (
 func (t TimeInForce) String() string {
 	return string(t)
 }
+
+type EventType string
+
+const (
+	OrderEventType   EventType = "executionReport"
+	AccountEventType EventType = "outboundAccountPosition"
+	BalanceEventType EventType = "balanceUpdate"
+	ExpiredEventType EventType = "listenKeyExpired"
+)

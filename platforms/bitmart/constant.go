@@ -63,3 +63,18 @@ func (o OrderStatus) Convert() constants.OrderStatus {
 		return constants.Error
 	}
 }
+
+const (
+	CancelAllEndpoint  = "/spot/v4/cancel_all"
+	CancelEndpoint     = "/spot/v3/cancel_order"
+	CancelsEndpoint    = "/spot/v4/cancel_orders"
+	BalanceEndpoint    = "/spot/v1/wallet"
+	OpenOrdersEndpoint = "/spot/v4/query/open-orders"
+	OrderBookEndpoint  = "/spot/quotation/v3/books"
+	NewOrderEndpoint   = "/spot/v2/submit_order"
+	BatchOrderEndpoint = "/spot/v4/batch_orders"
+	QueryOrderEndpoint = "/spot/v4/query/order"
+	TickerEndpoint     = "/spot/quotation/v3/ticker"
+	ServerTimeEndpoint = "/system/time"
+	KlineEndpoint      = "/spot/quotation/v3/lite-klines"
+)

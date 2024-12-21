@@ -13,10 +13,11 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/xavierzho/go-cexs/platforms"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/shopspring/decimal"
-	cexconns "github.com/xavierzho/go-cexs"
 	"github.com/xavierzho/go-cexs/constants"
 	"github.com/xavierzho/go-cexs/types"
 )
@@ -74,35 +75,16 @@ func TestWsLogin(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	//dialer := websocket.DefaultDialer
 
-	//conn, _, err := dialer.Dial("wss://stream.binance.com:9443/stream?streams="+listenKey, nil)
-	//if err != nil {
-	//	t.Error(err)
-	//}
-	////conn.WriteJSON(map[string]string{
-	////	"listenKey": listenKey,
-	////})
-	////_, subResp, err := conn.ReadMessage()
-	////if err != nil {
-	////	t.Error(err)
-	////}
-	//done := make(chan struct{})
-	////fmt.Printf("subscribe resp %s \n", subResp)
-	//go func() {
-	//	defer close(done)
-	//	for {
-	//		_, message, err := conn.ReadMessage()
-	//		if err != nil {
-	//			log.Println("read:", err)
-	//			return
-	//		}
-	//		buf := bytes.NewBuffer(message)
-	//
-	//		log.Printf("recv: %s", buf.String())
-	//	}
-	//}()
-	//select {}
+	updates := stream.GetOrderUpdate()
+
+	for {
+		select {
+		case update := <-updates:
+			fmt.Printf("%+v\n", update)
+
+		}
+	}
 
 }
 func encodeValues(v url.Values) []byte {
@@ -164,14 +146,14 @@ func TestSign(t *testing.T) {
 }
 
 func TestOrder(t *testing.T) {
-	cred := &cexconns.Credentials{
+	cred := &platforms.Credentials{
 		APIKey:    os.Getenv("BinanceAPIKEY"),
 		APISecret: os.Getenv("BinanceSERCET"),
 	}
 	fmt.Println(cred)
 	connector := NewConnector(cred, nil)
 	var symbol = "VTHOUSDT"
-	orderId, err := connector.PlaceOrder(types.UnifiedOrder{
+	orderId, err := connector.PlaceOrder(types.OrderEntry{
 		Symbol:   symbol,
 		Type:     constants.Limit,
 		Side:     "SELL",

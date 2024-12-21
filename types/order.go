@@ -5,7 +5,7 @@ import (
 	"github.com/xavierzho/go-cexs/constants"
 )
 
-type UnifiedOrder struct {
+type OrderEntry struct {
 	Symbol      string              `json:"symbol"`
 	Type        constants.OrderType `json:"type"`
 	Side        string              `json:"side"`
@@ -15,19 +15,19 @@ type UnifiedOrder struct {
 	TimeInForce *string             `json:"-"`
 }
 
-type UnifiedBalance struct {
+type BalanceEntry struct {
 	Free     string `json:"free"`
 	Locked   string `json:"locked"`
 	Currency string `json:"currency"`
 }
 
-type UnifiedOrderBook struct {
+type OrderBookEntry struct {
 	Symbol    string     `json:"symbol"`
 	Asks      [][]string `json:"asks"`
 	Bids      [][]string `json:"bids"`
 	Timestamp int64      `json:"timestamp"`
 }
-type UnifiedOpenOrder struct {
+type OpenOrderEntry struct {
 	Symbol   string                `json:"symbol"`
 	Type     constants.OrderType   `json:"type"`
 	Side     string                `json:"side"`
@@ -36,4 +36,21 @@ type UnifiedOpenOrder struct {
 	TradeNo  string                `json:"trade_no"`
 	Status   constants.OrderStatus `json:"status"`
 	OrderId  string                `json:"order_id"`
+}
+
+type TickerEntry struct {
+	Symbol string          `json:"symbol"`
+	Price  decimal.Decimal `json:"price"`
+}
+
+type OrderUpdateEntry struct {
+	OrderId       string
+	ClientOrderId string
+	Status        constants.OrderStatus
+}
+
+type BalanceUpdateEntry struct {
+}
+
+type AccountUpdateEntry struct {
 }

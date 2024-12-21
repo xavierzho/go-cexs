@@ -7,7 +7,7 @@ import (
 
 func (c *Connector) CancelAll(symbol string) error {
 	var response map[string]interface{}
-	err := c.Call(http.MethodPost, "spot/v4/cancel_all", map[string]interface{}{
+	err := c.Call(http.MethodPost, CancelAllEndpoint, map[string]interface{}{
 		"symbol": symbol,
 	}, constants.Signed, response)
 	if err != nil {
@@ -20,7 +20,7 @@ func (c *Connector) Cancel(symbol, orderId string) (bool, error) {
 	var response struct {
 		Result bool `json:"result"`
 	}
-	err := c.Call(http.MethodPost, "spot/v3/cancel_order", map[string]interface{}{
+	err := c.Call(http.MethodPost, CancelEndpoint, map[string]interface{}{
 		"symbol":   symbol,
 		"order_id": orderId,
 	}, constants.Signed, &response)
@@ -41,7 +41,7 @@ type CancelIdsResponse struct {
 func (c *Connector) CancelByIds(symbol string, orderIds []string) (map[string]bool, error) {
 	var response CancelIdsResponse
 	var result = make(map[string]bool)
-	err := c.Call(http.MethodPost, "spot/v4/cancel_orders", map[string]interface{}{
+	err := c.Call(http.MethodPost, CancelsEndpoint, map[string]interface{}{
 		"symbol":   symbol,
 		"orderIds": orderIds,
 	}, constants.Signed, &response)

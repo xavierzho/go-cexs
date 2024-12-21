@@ -1,19 +1,19 @@
 package binance
 
 import (
+	"github.com/xavierzho/go-cexs/platforms"
 	"net/http"
 
-	cexconns "github.com/xavierzho/go-cexs"
 	"github.com/xavierzho/go-cexs/constants"
 	"github.com/xavierzho/go-cexs/types"
 )
 
 type Connector struct {
-	*cexconns.Credentials
+	*platforms.Credentials
 	Client *http.Client
 }
 
-func NewConnector(base *cexconns.Credentials, client *http.Client) *Connector {
+func NewConnector(base *platforms.Credentials, client *http.Client) *Connector {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -55,8 +55,8 @@ func (c *Connector) AccountInfo() (*AccountResp, error) {
 	return account, err
 }
 
-func (c *Connector) Balance(symbols []string) (map[string]types.UnifiedBalance, error) {
-	var result = make(map[string]types.UnifiedBalance)
+func (c *Connector) Balance(symbols []string) (map[string]types.BalanceEntry, error) {
+	var result = make(map[string]types.BalanceEntry)
 	accountInfo, err := c.AccountInfo()
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func (c *Connector) Balance(symbols []string) (map[string]types.UnifiedBalance, 
 
 	if len(symbols) == 0 {
 		for _, balance := range accountInfo.Balances {
-			result[balance.Asset] = types.UnifiedBalance{
+			result[balance.Asset] = types.BalanceEntry{
 				Free:     balance.Free,
 				Locked:   balance.Locked,
 				Currency: balance.Asset,
@@ -79,7 +79,7 @@ func (c *Connector) Balance(symbols []string) (map[string]types.UnifiedBalance, 
 
 		for _, balance := range accountInfo.Balances {
 			if _, exists := symbolSet[balance.Asset]; exists {
-				result[balance.Asset] = types.UnifiedBalance{
+				result[balance.Asset] = types.BalanceEntry{
 					Free:     balance.Free,
 					Locked:   balance.Locked,
 					Currency: balance.Asset,
@@ -93,4 +93,9 @@ func (c *Connector) Balance(symbols []string) (map[string]types.UnifiedBalance, 
 
 func (c *Connector) Name() constants.Platform {
 	return constants.Binance
+}
+
+func (c *Connector) SymbolPattern(symbol string) string {
+	symbol, _ = constants.StandardizeSymbol(symbol)
+	return symbol
 }

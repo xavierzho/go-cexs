@@ -61,7 +61,7 @@ func (c *Connector) MatchOrderType(orderType constants.OrderType) types.OrderTyp
 	}
 }
 
-func (c *Connector) PlaceOrder(params types.UnifiedOrder) (string, error) {
+func (c *Connector) PlaceOrder(params types.OrderEntry) (string, error) {
 	resp := new(NewOrderFULL)
 	//fmt.Println("request", params)
 	orderType := c.MatchOrderType(params.Type)
@@ -79,7 +79,7 @@ func (c *Connector) PlaceOrder(params types.UnifiedOrder) (string, error) {
 	return strconv.FormatInt(resp.OrderId, 10), err
 }
 
-func (c *Connector) BatchOrder(orders []types.UnifiedOrder) ([]string, error) {
+func (c *Connector) BatchOrder(orders []types.OrderEntry) ([]string, error) {
 	var list []string
 	for _, order := range orders {
 		orderId, err := c.PlaceOrder(order)
@@ -201,7 +201,7 @@ type OpenOrder struct {
 	Status                  string `json:"status"`
 }
 
-func (c *Connector) PendingOrders(symbol string) ([]types.UnifiedOpenOrder, error) {
+func (c *Connector) PendingOrders(symbol string) ([]types.OpenOrderEntry, error) {
 	var openOrders []OpenOrder
 	err := c.Call(http.MethodGet, OpenOrdersEndpoint, map[string]any{
 		SymbolFiled: symbol,
@@ -209,11 +209,11 @@ func (c *Connector) PendingOrders(symbol string) ([]types.UnifiedOpenOrder, erro
 	if err != nil {
 		return nil, err
 	}
-	var result []types.UnifiedOpenOrder
+	var result []types.OpenOrderEntry
 	for _, order := range openOrders {
 		price, _ := decimal.NewFromString(order.Price)
 		quantity, _ := decimal.NewFromString(order.OrigQty)
-		result = append(result, types.UnifiedOpenOrder{
+		result = append(result, types.OpenOrderEntry{
 			OrderId:  strconv.FormatInt(order.OrderID, 10),
 			Type:     OrderType(order.Type).Convert(),
 			Side:     order.Side,

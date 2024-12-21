@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
+	"github.com/xavierzho/go-cexs/platforms"
 	"io/ioutil"
 	"log"
 	"testing"
@@ -59,4 +60,17 @@ func TestWsConnect(t *testing.T) {
 		}
 	}()
 	select {}
+}
+
+func TestStreamSign(t *testing.T) {
+	timestamp := "1589267764859"
+	apikey := "80618e45710812162b04892c7ee5ead4a3cc3e56"
+	apisecert := "6c6c98544461bbe71db2bca4c6d7fd0021e0ba9efc215f9c6ad41852df9d9df9"
+	apimemo := "test001"
+	signature := "3ceeb7e1b8cb165a975e28a2e2dfaca4d30b358873c0351c1a071d8c83314556"
+	stream := NewUserStream(platforms.NewCredentials(apikey, apisecert, &apimemo))
+	signed := stream.Sign(timestamp)
+	if signed != signature {
+		t.Errorf("no match %s-%s", signed, signature)
+	}
 }

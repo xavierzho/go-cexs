@@ -4,15 +4,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
+	"github.com/xavierzho/go-cexs/platforms"
 	"github.com/xavierzho/go-cexs/types"
 	"github.com/xavierzho/go-cexs/utils"
 	"strings"
 )
 
 type MarketStream struct {
-	dialer *websocket.Dialer
-	conn   *websocket.Conn
+	*platforms.StreamBase
 }
 
 type CandleEvent struct {
@@ -50,19 +49,18 @@ type DepthEvent struct {
 	Asks    [][]string `json:"a"`
 }
 
-func (stream *MarketStream) Connect(ctx context.Context) error {
+func NewMarketStream() *MarketStream {
+	return &MarketStream{
+		StreamBase: platforms.NewStream(),
+	}
+}
 
-	conn, _, err := stream.dialer.DialContext(ctx, StreamAPI, nil)
+func (stream *MarketStream) CandleStream(ctx context.Context, symbol, interval string, channel chan<- types.CandleEntry) error {
+	err := stream.Connect(StreamAPI)
 	if err != nil {
 		return err
 	}
-
-	stream.conn = conn
-	return nil
-}
-
-func (stream *MarketStream) CandleStream(ctx context.Context, symbol, interval string, channel chan<- types.Candle) {
-	err := stream.conn.WriteJSON(map[string]any{
+	err = stream.SendMessage(map[string]any{
 		"method": "SUBSCRIBE",
 		"id":     uuid.New().String(),
 		"params": []string{
@@ -70,27 +68,24 @@ func (stream *MarketStream) CandleStream(ctx context.Context, symbol, interval s
 		},
 	})
 	if err != nil {
-		return
-	}
-
-	if _, _, err := stream.conn.ReadMessage(); err != nil {
-		return
+		return err
 	}
 
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
+				stream.Close()
 				return
 			default:
-				_, msg, err := stream.conn.ReadMessage()
+				msg, err := stream.ReadMessage()
 				if err != nil {
 					continue
 				}
 				var event StreamResponse[CandleEvent]
 				_ = utils.Json.Unmarshal(msg, &event)
 				k := event.Data.Kline
-				channel <- types.Candle{
+				channel <- types.CandleEntry{
 					"open":       k.Open,
 					"high":       k.High,
 					"low":        k.Low,
@@ -102,10 +97,15 @@ func (stream *MarketStream) CandleStream(ctx context.Context, symbol, interval s
 			}
 		}
 	}()
+	return nil
 }
 
-func (stream *MarketStream) DepthStream(ctx context.Context, symbol string, channel chan<- DepthEvent) {
-	err := stream.conn.WriteJSON(map[string]any{
+func (stream *MarketStream) DepthStream(ctx context.Context, symbol string, channel chan<- types.DepthEntry) error {
+	err := stream.Connect(StreamAPI)
+	if err != nil {
+		return err
+	}
+	err = stream.SendMessage(map[string]any{
 		"method": "SUBSCRIBE",
 		"id":     uuid.New().String(),
 		"params": []string{
@@ -114,27 +114,28 @@ func (stream *MarketStream) DepthStream(ctx context.Context, symbol string, chan
 	})
 
 	if err != nil {
-		return
-	}
-
-	if _, _, err = stream.conn.ReadMessage(); err != nil {
-		return
+		return err
 	}
 
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
+				stream.Close()
 				return
 			default:
-				_, msg, err := stream.conn.ReadMessage()
+				msg, err := stream.ReadMessage()
 				if err != nil {
 					continue
 				}
 				var event StreamResponse[DepthEvent]
 				_ = utils.Json.Unmarshal(msg, &event)
-				channel <- event.Data
+				channel <- types.DepthEntry{
+					Bids: event.Data.Bids,
+					Asks: event.Data.Asks,
+				}
 			}
 		}
 	}()
+	return nil
 }

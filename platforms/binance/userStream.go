@@ -2,13 +2,16 @@ package binance
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
+	"github.com/xavierzho/go-cexs/platforms"
+	"github.com/xavierzho/go-cexs/types"
 	"github.com/xavierzho/go-cexs/utils"
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 var ListenKeyEndpoint = RestAPI + "/api/v3/userDataStream"
@@ -16,8 +19,7 @@ var ListenKeyEndpoint = RestAPI + "/api/v3/userDataStream"
 type UserDataStream struct {
 	APIKey    string
 	APISecret string
-	dialer    *websocket.Dialer
-	conn      *websocket.Conn
+	base      *platforms.StreamBase
 
 	account chan StreamResponse[AccountUpdate]
 	balance chan StreamResponse[BalanceUpdate]
@@ -115,20 +117,21 @@ func NewUserStream(apikey, apiSecret string) *UserDataStream {
 	return &UserDataStream{
 		APIKey:    apikey,
 		APISecret: apiSecret,
-		dialer:    websocket.DefaultDialer,
+		base:      platforms.NewStream(),
+		order:     make(chan StreamResponse[OrderUpdate], 100),
+		balance:   make(chan StreamResponse[BalanceUpdate], 100),
+		account:   make(chan StreamResponse[AccountUpdate], 100),
 	}
 }
 
 // https://developers.binance.com/docs/binance-spot-api-docs/user-data-stream#create-a-listenkey-user_stream
 func (stream *UserDataStream) getListenKey() error {
-	//payload := map[string]string{}
 	req, err := http.NewRequest(http.MethodPost, ListenKeyEndpoint, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add(HeaderAPIKEY, stream.APIKey)
-	//http.Post(fmt.Sprintf("%s/api/v3/userDataStream", HttpBaseEndpoint), "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
@@ -185,6 +188,7 @@ func (stream *UserDataStream) keepAlive(listenKey string) error {
 	_, err = http.DefaultClient.Do(req)
 	return err
 }
+
 func (stream *UserDataStream) Reconnect() error {
 	var attempt int
 	for attempt = 0; attempt < 3; attempt++ {
@@ -199,15 +203,13 @@ func (stream *UserDataStream) Reconnect() error {
 		}
 
 		// 尝试建立 WebSocket 连接
-		conn, _, err := stream.dialer.Dial(StreamAPI+"?streams="+stream.listenKey, nil)
+		err := stream.base.Connect(StreamAPI + "?streams=" + stream.listenKey)
 		if err != nil {
 			log.Printf("Failed to reconnect WebSocket: %v\n", err)
 			//time.Sleep(stream.reconnectInterval)
 			continue
 		}
 
-		// 更新连接
-		stream.conn = conn
 		log.Println("Reconnected successfully")
 
 		// 重新开始接收消息
@@ -224,18 +226,17 @@ func (stream *UserDataStream) Login() error {
 		return err
 	}
 	//
-	conn, _, err := stream.dialer.Dial(StreamAPI+"?streams="+stream.listenKey, nil)
+	err = stream.base.Connect(StreamAPI + "?streams=" + stream.listenKey)
 	if err != nil {
 		return err
 	}
-	stream.conn = conn
 	go stream.listenMessages()
 	return nil
 }
 
 func (stream *UserDataStream) listenMessages() {
 	for {
-		_, msg, err := stream.conn.ReadMessage()
+		msg, err := stream.base.ReadMessage()
 		if err != nil {
 			log.Printf("Error reading WebSocket message: %v\n", err)
 			// 在连接失败时尝试重连
@@ -254,19 +255,36 @@ func (stream *UserDataStream) listenMessages() {
 		switch utils.Json.Get(msg, "data", "e").ToString() {
 		case "executionReport":
 			var event StreamResponse[OrderUpdate]
-
+			fmt.Println("order update ")
 			_ = utils.Json.Unmarshal(msg, &event)
-			stream.order <- event
+			select {
+			case stream.order <- event:
+			default:
+				fmt.Println("Failed to send order update to channel.")
+			}
+
 		case "outboundAccountPosition":
 			var event StreamResponse[AccountUpdate]
 
 			_ = utils.Json.Unmarshal(msg, &event)
-			stream.account <- event
+			select {
+			case stream.account <- event:
+				// Successfully sent account update
+			default:
+				fmt.Println("Failed to send account update to channel.")
+			}
+			//stream.account <- event
 		case "balanceUpdate":
 			var event StreamResponse[BalanceUpdate]
 
 			_ = utils.Json.Unmarshal(msg, &event)
-			stream.balance <- event
+			select {
+			case stream.balance <- event:
+				// Successfully sent balance update
+			default:
+				fmt.Println("Failed to send balance update to channel.")
+			}
+			//stream.balance <- event
 		case "listenKeyExpired":
 			log.Println("ListenKey expired, reconnecting...")
 			// 当 listenKey 过期时，重新连接
@@ -288,4 +306,119 @@ func (stream *UserDataStream) GetAccountUpdate() <-chan StreamResponse[AccountUp
 
 func (stream *UserDataStream) GetBalanceUpdate() <-chan StreamResponse[BalanceUpdate] {
 	return stream.balance
+}
+
+func (stream *UserDataStream) OrderStream(ctx context.Context, channel chan<- types.OrderUpdateEntry) error {
+	err := stream.base.Connect(StreamAPI)
+	if err != nil {
+		return err
+	}
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+
+				return
+			default:
+				msg, err := stream.base.ReadMessage()
+				if err != nil {
+					continue
+				}
+				switch EventType(utils.Json.Get(msg, "data", "e").ToString()) {
+				case OrderEventType:
+					var event StreamResponse[OrderUpdate]
+
+					_ = utils.Json.Unmarshal(msg, &event)
+					channel <- types.OrderUpdateEntry{
+						OrderId:       strconv.Itoa(event.Data.OrderId),
+						ClientOrderId: event.Data.ClientOrderId,
+						Status:        OrderStatus(event.Data.OrderStatus).Convert(),
+					}
+				case ExpiredEventType:
+					log.Println("ListenKey expired, reconnecting...")
+					// 当 listenKey 过期时，重新连接
+					if err := stream.Reconnect(); err != nil {
+						log.Printf("Failed to reconnect after listenKey expired: %v\n", err)
+						return
+					}
+				}
+			}
+		}
+	}(ctx)
+	return nil
+}
+
+func (stream *UserDataStream) BalanceStream(ctx context.Context, channel chan<- types.BalanceUpdateEntry) error {
+	err := stream.base.Connect(StreamAPI)
+	if err != nil {
+		return err
+	}
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+
+				return
+			default:
+				msg, err := stream.base.ReadMessage()
+				if err != nil {
+					continue
+				}
+				switch EventType(utils.Json.Get(msg, "data", "e").ToString()) {
+				case BalanceEventType:
+					var event StreamResponse[BalanceUpdate]
+
+					_ = utils.Json.Unmarshal(msg, &event)
+					channel <- types.BalanceUpdateEntry{}
+				case ExpiredEventType:
+					log.Println("ListenKey expired, reconnecting...")
+					// 当 listenKey 过期时，重新连接
+					if err := stream.Reconnect(); err != nil {
+						log.Printf("Failed to reconnect after listenKey expired: %v\n", err)
+						return
+					}
+				}
+
+			}
+		}
+	}(ctx)
+
+	return nil
+}
+
+func (stream *UserDataStream) AccountStream(ctx context.Context, channel chan<- types.AccountUpdateEntry) error {
+	err := stream.base.Connect(StreamAPI)
+	if err != nil {
+		return err
+	}
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				msg, err := stream.base.ReadMessage()
+				if err != nil {
+					continue
+				}
+				switch EventType(utils.Json.Get(msg, "data", "e").ToString()) {
+				case AccountEventType:
+					var event StreamResponse[AccountUpdate]
+
+					_ = utils.Json.Unmarshal(msg, &event)
+					channel <- types.AccountUpdateEntry{}
+				case ExpiredEventType:
+					log.Println("ListenKey expired, reconnecting...")
+					// 当 listenKey 过期时，重新连接
+					if err := stream.Reconnect(); err != nil {
+						log.Printf("Failed to reconnect after listenKey expired: %v\n", err)
+						return
+					}
+				}
+
+			}
+		}
+	}(ctx)
+
+	return nil
 }

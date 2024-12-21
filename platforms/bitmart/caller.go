@@ -13,14 +13,15 @@ import (
 	"time"
 
 	"github.com/xavierzho/go-cexs/constants"
-	"github.com/xavierzho/go-cexs/utils"
 )
 
-func (c *Connector) Sign(req *http.Request, message []byte) {
+func (c *Connector) Sign(message []byte) string {
 	var key = bytes.NewBufferString(c.APISecret)
 
 	mac := hmac.New(sha256.New, key.Bytes())
-	req.Header.Add("X-BM-SIGN", hex.EncodeToString(mac.Sum(message)))
+	mac.Write(message)
+	return hex.EncodeToString(mac.Sum(nil))
+	//req.Header.Add("X-BM-SIGN", hex.EncodeToString(mac.Sum(message)))
 }
 func preSign(timestamp time.Time, memo string, body []byte) []byte {
 	var buf = bytes.NewBufferString(fmt.Sprintf("%d#%s#", timestamp.UnixNano(), memo))
@@ -29,21 +30,25 @@ func preSign(timestamp time.Time, memo string, body []byte) []byte {
 }
 
 type Response struct {
-	Code    int         `json:"code"`
-	Trace   string      `json:"trace"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data"`
+	Code    int             `json:"code"`
+	Trace   string          `json:"trace"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data"`
 }
 
 func (c *Connector) Call(method string, route string, params map[string]interface{}, authType constants.AuthType,
-	returnType interface{}) error {
+	returnType any) error {
 	timestamp := time.Now()
 	header := http.Header{}
 	header.Add("Content-Type", "application/json")
 	header.Add("User-Agent", "bitmart-python-sdk-api/")
+	symbol, ok := params["symbol"]
+	if ok {
+		params["symbol"] = c.SymbolPattern(symbol.(string))
+	}
 	bodyData, _ := json.Marshal(params)
 	var body = bytes.NewBuffer(bodyData)
-	url := fmt.Sprintf("%s/%s", RestAPI, route)
+	url := fmt.Sprintf("%s%s", RestAPI, route)
 
 	var req, err = http.NewRequest(method, url, nil)
 	if err != nil {
@@ -54,7 +59,8 @@ func (c *Connector) Call(method string, route string, params map[string]interfac
 	} else {
 		header.Add("X-BM-KEY", c.APIKey)
 		header.Add("X-BM-TIMESTAMP", strconv.FormatInt(timestamp.UnixNano(), 10))
-		c.Sign(req, preSign(timestamp, *c.Option, bodyData))
+		signature := c.Sign(preSign(timestamp, *c.Option, bodyData))
+		req.Header.Add("X-BM-SIGN", signature)
 	}
 
 	if method == http.MethodGet {
@@ -67,20 +73,12 @@ func (c *Connector) Call(method string, route string, params map[string]interfac
 	if err != nil {
 		return err
 	}
-	err = utils.Json.NewDecoder(resp.Body).Decode(&response)
+	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
 		return err
 	}
 	if response.Code != 1000 || resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("[Bitmart](error code=%d) %s", response.Code, response.Message)
 	}
-	dataBytes, err := utils.Json.Marshal(response.Data)
-	if err != nil {
-		return err
-	}
-	err = utils.Json.Unmarshal(dataBytes, returnType)
-	if err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(response.Data, returnType)
 }
