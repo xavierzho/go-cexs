@@ -1,0 +1,26 @@
+package {{ .Package }}
+
+import (
+	"github.com/xavierzho/go-cexs/constants"
+	"github.com/xavierzho/go-cexs/platforms"
+	"net/http"
+)
+
+type Connector struct {
+	*platforms.Credentials
+	Client *http.Client
+}
+
+func (c *Connector) Name() constants.Platform {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Connector) SymbolPattern(symbol string) string {
+	//TODO implement me
+	panic("implement me")
+}
+
+func NewConnector(cred *platforms.Credentials, client *http.Client) platforms.Connector {
+	return &Connector{Credentials: cred, Client: client}
+}

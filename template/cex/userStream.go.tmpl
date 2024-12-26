@@ -1,0 +1,39 @@
+package {{ .Package }}
+
+import (
+	"context"
+	"github.com/xavierzho/go-cexs/platforms"
+	"github.com/xavierzho/go-cexs/types"
+)
+
+type UserDataStream struct {
+	*platforms.Credentials
+	*platforms.StreamBase
+}
+
+func (u *UserDataStream) Login() error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (u *UserDataStream) OrderStream(ctx context.Context, channel chan<- types.OrderUpdateEntry) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (u *UserDataStream) BalanceStream(ctx context.Context, channel chan<- types.BalanceUpdateEntry) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (u *UserDataStream) AccountStream(ctx context.Context, channel chan<- types.AccountUpdateEntry) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func NewUserStream(cred *platforms.Credentials) platforms.UserDataStreamer {
+	return &UserDataStream{
+		StreamBase:  platforms.NewStream(),
+		Credentials: cred,
+	}
+}

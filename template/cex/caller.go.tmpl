@@ -1,0 +1,48 @@
+package {{ .Package }}
+
+import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"github.com/xavierzho/go-cexs/constants"
+	"io"
+	"net/http"
+)
+
+func (c *Connector) Sign(params []byte) string {
+	mac := hmac.New(sha256.New, []byte(c.APISecret))
+	mac.Write(params)
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func (c *Connector) Call(method string, route string, params map[string]interface{}, authType constants.AuthType, returnType interface{}) error {
+	// Add necessary parameters
+	bytesBody, err := json.Marshal(params)
+	if err != nil {
+		return err
+	}
+	switch authType {
+	case constants.Keyed:
+		// key only request
+	case constants.Signed:
+		// must sign
+	default:
+		// default None
+	}
+	req, err := http.NewRequest(method, RestAPI+route, bytes.NewReader(bytesBody))
+	if err != nil {
+		return err
+	}
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(respBody, returnType)
+}

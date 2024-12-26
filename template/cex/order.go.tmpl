@@ -1,0 +1,47 @@
+package {{ .Package }}
+
+import (
+	"github.com/xavierzho/go-cexs/constants"
+	"github.com/xavierzho/go-cexs/types"
+)
+
+func (c *Connector) PlaceOrder(params types.OrderEntry) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Connector) BatchOrder(orders []types.OrderEntry) ([]string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Connector) GetOrderStatus(symbol string, orderId string) (constants.OrderStatus, error) {
+	//TODO implement me
+	panic("implement me")
+}
+func (c *Connector) QueryOrder(symbol string, orderId string) (types.QueryOrder, error) {
+	//TODO implement me
+	panic("implement me")
+}
+func (c *Connector) Cancel(symbol, orderId string) (bool, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Connector) CancelAll(symbol string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Connector) CancelByIds(symbol string, orderIds []string) (map[string]bool, error) {
+	//TODO implement me
+	panic("implement me")
+}
+func (c *Connector) PendingOrders(symbol string) ([]types.OpenOrderEntry, error) {
+	//TODO implement me
+	panic("implement me")
+}
+func (c *Connector) Balance(symbols []string) (map[string]types.BalanceEntry, error) {
+	//TODO implement me
+	panic("implement me")
+}

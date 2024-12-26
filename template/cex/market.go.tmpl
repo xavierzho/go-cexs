@@ -1,0 +1,23 @@
+package {{ .Package }}
+
+import "github.com/xavierzho/go-cexs/types"
+
+func (c *Connector) GetOrderBook(symbol string, depth *int64) (*types.OrderBookEntry, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.CandleEntry, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Connector) GetServerTime() (int64, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Connector) GetTicker(symbol string) (types.TickerEntry, error) {
+	//TODO implement me
+	panic("implement me")
+}

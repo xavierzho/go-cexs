@@ -1,0 +1,27 @@
+package {{ .Package }}
+
+import (
+	"context"
+	"github.com/xavierzho/go-cexs/platforms"
+	"github.com/xavierzho/go-cexs/types"
+)
+
+type MarketStream struct {
+	*platforms.StreamBase
+}
+
+func (m *MarketStream) DepthStream(ctx context.Context, symbol string, channel chan<- types.DepthEntry) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *MarketStream) CandleStream(ctx context.Context, symbol, interval string, channel chan<- types.CandleEntry) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func NewMarketStream() platforms.MarketStreamer {
+	return &MarketStream{
+		StreamBase: platforms.NewStream(),
+	}
+}
