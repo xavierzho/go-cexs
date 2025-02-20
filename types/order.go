@@ -54,3 +54,17 @@ type BalanceUpdateEntry struct {
 
 type AccountUpdateEntry struct {
 }
+
+type QueryOrder struct {
+	Symbol     string                `json:"symbol"`
+	Type       constants.OrderType   `json:"type"`
+	Side       string                `json:"side"`
+	Price      decimal.Decimal       `json:"price"`
+	Quantity   decimal.Decimal       `json:"quantity"`
+	TradeNo    string                `json:"trade_no"`
+	OrderId    string                `json:"order_id"`
+	Status     constants.OrderStatus `json:"status"`
+	CreateTime int64                 `json:"create_time"`
+	UpdateTime int64                 `json:"update_time"`
+	Filled     decimal.Decimal       `json:"filled,omitempty"`
+}

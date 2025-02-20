@@ -1,44 +1,46 @@
 package okx
 
 import (
+	"context"
 	"fmt"
-	"github.com/gorilla/websocket"
 	"testing"
+	"time"
+
+	"github.com/xavierzho/go-cexs/types"
 )
 
-func TestWsConnect(t *testing.T) {
-	const url = "wss://ws.okx.com:8443/ws/v5/public"
-	dialer := websocket.DefaultDialer
-	conn, _, err := dialer.Dial(url, nil)
+func TestMarketStream(t *testing.T) {
+	stream := NewMarketStream()
+	ctx, cancel := context.WithCancel(context.Background())
+	var symbol = "BTCUSDT"
+	var candles = make(chan types.CandleEntry)
+	err := stream.CandleStream(ctx, symbol, "1m", candles)
 	if err != nil {
 		t.Error(err)
 	}
-	conn.WriteJSON(map[string]any{
-		"op": "subscribe",
-		"args": []map[string]string{
-			{
-				"channel": "index-tickers",
-				"instId":  "BTC-USDT",
-			},
-		},
-	})
-	_, msg, err := conn.ReadMessage()
+	var depths = make(chan types.DepthEntry)
+	stream2 := NewMarketStream()
+	err = stream2.DepthStream(ctx, symbol, depths)
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Printf("subscibe success %s\n", msg)
-	done := make(chan struct{})
 	go func() {
-		defer close(done)
-
 		for {
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				t.Error(err)
+			select {
+			case <-ctx.Done():
+				return
+			case candle := <-candles:
+				fmt.Println(symbol, candle)
+			case depth := <-depths:
+				fmt.Println(symbol, depth)
 			}
-
-			fmt.Printf("recv %s\n", msg)
 		}
 	}()
-	select {}
+	time.Sleep(10 * time.Second)
+	cancel()
+}
+
+func TestTime(t *testing.T) {
+	ts := time.Now().Format("2006-01-02T15:04:05.999Z")
+	fmt.Println(ts)
 }

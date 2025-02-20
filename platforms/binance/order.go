@@ -1,6 +1,7 @@
 package binance
 
 import (
+	"github.com/xavierzho/go-cexs/platforms"
 	"net/http"
 	"strconv"
 	"strings"
@@ -65,7 +66,7 @@ func (c *Connector) PlaceOrder(params types.OrderEntry) (string, error) {
 	resp := new(NewOrderFULL)
 	//fmt.Println("request", params)
 	orderType := c.MatchOrderType(params.Type)
-	err := c.Call(http.MethodPost, OrderEndpoint, map[string]any{
+	err := c.Call(http.MethodPost, OrderEndpoint, &platforms.ObjectBody{
 		SymbolFiled:        params.Symbol,
 		"side":             strings.ToUpper(params.Side),
 		"type":             orderType,
@@ -135,7 +136,7 @@ func (c *Connector) Cancel(symbol, orderId string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	err = c.Call(http.MethodDelete, OrderEndpoint, map[string]any{
+	err = c.Call(http.MethodDelete, OrderEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
 		"orderId":   od,
 	}, constants.Signed, resp)
@@ -149,7 +150,7 @@ func (c *Connector) Cancel(symbol, orderId string) (bool, error) {
 	return true, nil
 }
 func (c *Connector) CancelAll(symbol string) error {
-	return c.Call(http.MethodDelete, OpenOrdersEndpoint, map[string]any{
+	return c.Call(http.MethodDelete, OpenOrdersEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
 	}, constants.Signed, nil)
 }
@@ -165,17 +166,45 @@ func (c *Connector) CancelByIds(symbol string, orderIds []string) (map[string]bo
 	}
 	return result, nil
 }
-
-func (c *Connector) GetOrderStatus(symbol string, orderId string) (constants.OrderStatus, error) {
+func (c *Connector) queryOrder(symbol, orderId string) (*QueryOrder, error) {
 	var resp = new(QueryOrder)
-	err := c.Call(http.MethodGet, OrderEndpoint, map[string]any{
+	err := c.Call(http.MethodGet, OrderEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
 		"orderId":   orderId,
 	}, constants.Signed, resp)
 	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+func (c *Connector) GetOrderStatus(symbol string, orderId string) (constants.OrderStatus, error) {
+	resp, err := c.queryOrder(symbol, orderId)
+	if err != nil {
 		return constants.Error, err
 	}
 	return OrderStatus(resp.Status).Convert(), err
+}
+func (c *Connector) QueryOrder(symbol string, orderId string) (types.QueryOrder, error) {
+	resp, err := c.queryOrder(symbol, orderId)
+	if err != nil {
+		return types.QueryOrder{}, err
+	}
+	price, _ := decimal.NewFromString(resp.Price)
+	amount, _ := decimal.NewFromString(resp.OrigQty)
+	filled, _ := decimal.NewFromString(resp.ExecutedQty)
+	return types.QueryOrder{
+		Symbol:     resp.Symbol,
+		Type:       OrderType(resp.Type).Convert(),
+		Status:     OrderStatus(resp.Status).Convert(),
+		Side:       strings.ToUpper(resp.Side),
+		Price:      price,
+		Quantity:   amount,
+		OrderId:    strconv.FormatInt(int64(resp.OrderID), 10),
+		TradeNo:    resp.ClientOrderID,
+		CreateTime: resp.Time,
+		UpdateTime: resp.UpdateTime,
+		Filled:     filled,
+	}, nil
 }
 
 type OpenOrder struct {
@@ -203,7 +232,7 @@ type OpenOrder struct {
 
 func (c *Connector) PendingOrders(symbol string) ([]types.OpenOrderEntry, error) {
 	var openOrders []OpenOrder
-	err := c.Call(http.MethodGet, OpenOrdersEndpoint, map[string]any{
+	err := c.Call(http.MethodGet, OpenOrdersEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
 	}, constants.Signed, &openOrders)
 	if err != nil {

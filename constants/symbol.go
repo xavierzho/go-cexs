@@ -6,21 +6,49 @@ import (
 	"strings"
 )
 
-// StandardizeSymbol 统一的交易对格式：大写字母，下划线分隔 (例如：BTC_USDT)
+var UnifiedPattern = regexp.MustCompile(`([A-Z0-9]+)(USDT|BTC|USDC)`)
+
+// StandardizeSymbol unifies the symbol format. For example: ETHUSDT
 func StandardizeSymbol(symbol string) (string, error) {
-	// 移除所有非字母数字字符
-	reg := regexp.MustCompile(`[^a-zA-Z0-9$]`)
+	// Remove all non-alphanumeric characters
+	reg := regexp.MustCompile(`[^a-zA-Z0-9]`)
 	cleanedSymbol := reg.ReplaceAllString(symbol, "")
 
-	// 将所有字母转换为大写
+	// Convert all letters to uppercase
 	cleanedSymbol = strings.ToUpper(cleanedSymbol)
 
-	// 使用正则表达式匹配两个部分或多个部分
-	reg = regexp.MustCompile(`([A-Z0-9]+)(USDT|USDC|BTC)`)
-	matches := reg.FindStringSubmatch(cleanedSymbol)
+	// Use a regular expression to match only two parts
 
+	matches := UnifiedPattern.FindStringSubmatch(cleanedSymbol)
 	if len(matches) != 3 {
 		return "", fmt.Errorf("invalid symbol format: %s", symbol)
 	}
 	return fmt.Sprintf("%s%s", matches[1], matches[2]), nil
+}
+
+func SymbolWithUnderline(symbol string) string {
+
+	matches := UnifiedPattern.FindStringSubmatch(symbol)
+	if len(matches) != 3 {
+		return ""
+	}
+	return fmt.Sprintf("%s_%s", matches[1], matches[2])
+}
+
+// SymbolWithHyphen returns the symbol with a hyphen separator. For example: ETH-USDT
+func SymbolWithHyphen(symbol string) string {
+	// First, standardize the symbol
+	standardizedSymbol, err := StandardizeSymbol(symbol)
+	if err != nil {
+		return symbol // Return the original symbol if standardization fails
+	}
+
+	// Extract the two parts using the unified pattern
+	matches := UnifiedPattern.FindStringSubmatch(standardizedSymbol)
+	if len(matches) != 3 {
+		return standardizedSymbol // Return the standardized symbol if extraction fails
+	}
+
+	// Combine the two parts with a hyphen
+	return fmt.Sprintf("%s-%s", matches[1], matches[2])
 }

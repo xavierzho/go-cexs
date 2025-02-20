@@ -1,16 +1,16 @@
 package constants
 
-// Platform exchange name
+// Platform system identity exchange name
 type Platform string
 
 const (
 	Binance Platform = "Binance"
 	Bitmart Platform = "Bitmart"
-	CoinW   Platform = "CoinW"
 	Mexc    Platform = "Mexc"
 	LBank   Platform = "LBank"
-	XT      Platform = "XT"
 	ByBit   Platform = "ByBit"
+	Gate    Platform = "Gate"
+	Okx     Platform = "Okx"
 )
 
 func (p Platform) String() string {

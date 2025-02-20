@@ -2,6 +2,7 @@ package binance
 
 import (
 	"github.com/shopspring/decimal"
+	"github.com/xavierzho/go-cexs/platforms"
 	"net/http"
 
 	"github.com/xavierzho/go-cexs/constants"
@@ -10,7 +11,7 @@ import (
 
 func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.CandleEntry, error) {
 	var klines [][]any
-	err := c.Call(http.MethodGet, KlineEndpoint, map[string]any{
+	err := c.Call(http.MethodGet, KlineEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
 		"interval":  interval,
 		"limit":     limit,
@@ -36,7 +37,7 @@ func (c *Connector) GetServerTime() (int64, error) {
 	var resp = new(struct {
 		ServerTime int64
 	})
-	err := c.Call(http.MethodGet, ServerTimeEndpoint, map[string]any{}, constants.None, resp)
+	err := c.Call(http.MethodGet, ServerTimeEndpoint, &platforms.ObjectBody{}, constants.None, resp)
 	return resp.ServerTime, err
 }
 
@@ -50,7 +51,7 @@ func (c *Connector) GetOrderBook(symbol string, depth *int64) (*types.OrderBookE
 		Bids         [][]string `json:"bids"`
 		Asks         [][]string `json:"asks"`
 	})
-	err := c.Call(http.MethodGet, DepthEndpoint, map[string]any{
+	err := c.Call(http.MethodGet, DepthEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
 		"limit":     limit,
 	}, constants.None, orderBook)
@@ -68,7 +69,7 @@ func (c *Connector) GetTicker(symbol string) (types.TickerEntry, error) {
 		Symbol string `json:"symbol"`
 		Price  string `json:"price"`
 	})
-	err := c.Call(http.MethodGet, PriceTickerEndpoint, map[string]any{
+	err := c.Call(http.MethodGet, PriceTickerEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
 	}, constants.None, resp)
 	if err != nil {

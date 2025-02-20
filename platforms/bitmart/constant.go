@@ -78,3 +78,7 @@ const (
 	ServerTimeEndpoint = "/system/time"
 	KlineEndpoint      = "/spot/quotation/v3/lite-klines"
 )
+
+const (
+	SymbolFiled = "symbol"
+)

@@ -92,6 +92,7 @@ const (
 	ServerTimeEndpoint  = "/api/v3/time"
 	KlineEndpoint       = "/api/v3/klines"
 	PriceTickerEndpoint = "/api/v3/ticker/price"
+	ListenKeyEndpoint   = "/api/v3/userDataStream"
 )
 
 type NewOrderRespType string

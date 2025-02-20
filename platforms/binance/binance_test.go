@@ -70,21 +70,14 @@ func TestWsConnect(t *testing.T) {
 func TestWsLogin(t *testing.T) {
 	apikey := os.Getenv("BinanceAPIKEY")
 	secret := os.Getenv("BinanceSERCET")
-	stream := NewUserStream(apikey, secret)
+
+	stream := NewUserStream(platforms.NewCredentials(apikey, secret, nil))
 	err := stream.Login()
 	if err != nil {
 		t.Error(err)
 	}
 
-	updates := stream.GetOrderUpdate()
-
-	for {
-		select {
-		case update := <-updates:
-			fmt.Printf("%+v\n", update)
-
-		}
-	}
+	_ = stream.Login()
 
 }
 func encodeValues(v url.Values) []byte {

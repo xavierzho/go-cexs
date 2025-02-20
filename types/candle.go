@@ -1,5 +1,10 @@
 package types
 
+// CandleBaseKeys for CandleEntry.FromList keys params
+var CandleBaseKeys = []string{
+	"time_start", "open", "high", "low", "close", "volume",
+}
+
 //	type CandleEntry struct {
 //		O  string // open
 //		H  string // high

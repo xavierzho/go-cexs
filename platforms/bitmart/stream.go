@@ -3,6 +3,7 @@ package bitmart
 import (
 	"context"
 	"fmt"
+	"github.com/xavierzho/go-cexs/constants"
 	"github.com/xavierzho/go-cexs/platforms"
 	"github.com/xavierzho/go-cexs/types"
 	"github.com/xavierzho/go-cexs/utils"
@@ -41,6 +42,7 @@ func (stream *MarketStream) CandleStream(ctx context.Context, symbol, interval s
 	if err != nil {
 		return err
 	}
+	symbol = constants.SymbolWithUnderline(symbol)
 	err = stream.SendMessage(map[string]any{
 		"op": "subscribe",
 		"args": []string{
@@ -67,10 +69,12 @@ func (stream *MarketStream) CandleStream(ctx context.Context, symbol, interval s
 				var event StreamResp[CandleUpdate]
 
 				_ = utils.Json.Unmarshal(msg, &event)
-				var candle = new(types.CandleEntry)
+				for _, datum := range event.Data {
+					var candle = new(types.CandleEntry)
+					candle.FromList(datum.Candle, keys)
+					channel <- *candle
+				}
 
-				candle.FromList(event.Data[0].Candle, keys)
-				channel <- types.CandleEntry{}
 			}
 		}
 	}()
@@ -94,6 +98,7 @@ func (stream *MarketStream) DepthStream(ctx context.Context, symbol string, chan
 	if err != nil {
 		return err
 	}
+	symbol = constants.SymbolWithUnderline(symbol)
 	err = stream.SendMessage(map[string]any{
 		"op": "subscribe",
 		"args": []string{

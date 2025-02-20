@@ -1,47 +1,58 @@
 package mexc
 
 import (
-	"bytes"
+	"context"
 	"fmt"
-	"github.com/gorilla/websocket"
-	"log"
+	"github.com/xavierzho/go-cexs/platforms"
+	"net/http"
 	"testing"
+	"time"
+
+	"github.com/xavierzho/go-cexs/types"
 )
 
-func TestWsConnect(t *testing.T) {
-	const baseURL = "wss://wbs.mexc.com/ws"
-	dialer := websocket.DefaultDialer
-
-	conn, _, err := dialer.Dial(baseURL, nil)
+func TestMarketAPI(t *testing.T) {
+	cex := NewConnector(&platforms.Credentials{}, &http.Client{})
+	var symbol = "BTCUSDT"
+	candles, err := cex.GetCandles(symbol, "1m", 300)
 	if err != nil {
 		t.Error(err)
-		return
 	}
-	var subPayload = map[string]any{
-		"method": "SUBSCRIPTION", "params": []string{
-			"spot@public.deals.v3.api@BTCUSDT",
-		},
-	}
-	conn.WriteJSON(subPayload)
-	_, pong, err := conn.ReadMessage()
+	fmt.Println(candles)
+}
+func TestMarketStream(t *testing.T) {
+	stream := NewMarketStream()
+	ctx, cancel := context.WithCancel(context.Background())
+	var symbol = "BTCUSDT"
+	var candles = make(chan types.CandleEntry)
+	err := stream.CandleStream(ctx, symbol, "1m", candles)
 	if err != nil {
 		t.Error(err)
-		return
 	}
-	fmt.Printf("sub resp %s\n", pong)
-	done := make(chan struct{})
+	var depths = make(chan types.DepthEntry)
+	stream2 := NewMarketStream()
+	err = stream2.DepthStream(ctx, symbol, depths)
+	if err != nil {
+		t.Error(err)
+	}
 	go func() {
-		defer close(done)
 		for {
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				log.Println("read:", err)
+			select {
+			case <-ctx.Done():
 				return
+			case candle := <-candles:
+				fmt.Println(symbol, candle)
+			case depth := <-depths:
+				fmt.Println(symbol, depth)
 			}
-			buf := bytes.NewBuffer(message)
-
-			log.Printf("recv: %s", buf.String())
 		}
 	}()
-	select {}
+	time.Sleep(10 * time.Second)
+	cancel()
+}
+
+func TestUserDataStream(t *testing.T) {
+
+	stream := NewUserStream(platforms.NewCredentials("mx0vglqaFSgIoT4AG1", "69b258384be14fa3a6401370eb1c94d5", nil))
+	stream.Login()
 }

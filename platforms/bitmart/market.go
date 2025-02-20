@@ -3,6 +3,7 @@ package bitmart
 import (
 	"github.com/shopspring/decimal"
 	"github.com/xavierzho/go-cexs/constants"
+	"github.com/xavierzho/go-cexs/platforms"
 	"github.com/xavierzho/go-cexs/types"
 	"net/http"
 	"strconv"
@@ -20,7 +21,7 @@ func (c *Connector) Balance(symbols []string) (map[string]types.BalanceEntry, er
 	var response struct {
 		Wallet []BalanceResponse
 	}
-	err := c.Call(http.MethodGet, BalanceEndpoint, map[string]interface{}{}, constants.Keyed, &response)
+	err := c.Call(http.MethodGet, BalanceEndpoint, &platforms.ObjectBody{}, constants.Keyed, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -49,9 +50,9 @@ func (c *Connector) GetOrderBook(symbol string, limit *int64) (*types.OrderBookE
 	if limit == nil {
 		*limit = 30
 	}
-	err := c.Call(http.MethodGet, OrderBookEndpoint, map[string]interface{}{
-		"symbol": symbol,
-		"limit":  limit,
+	err := c.Call(http.MethodGet, OrderBookEndpoint, &platforms.ObjectBody{
+		SymbolFiled: symbol,
+		"limit":     limit,
 	}, constants.None, &response)
 	if err != nil {
 		return nil, err
@@ -70,10 +71,10 @@ func (c *Connector) GetOrderBook(symbol string, limit *int64) (*types.OrderBookE
 
 func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.CandleEntry, error) {
 	var resp [][]any
-	err := c.Call(http.MethodGet, KlineEndpoint, map[string]interface{}{
-		"symbol": symbol,
-		"step":   interval,
-		"limit":  limit,
+	err := c.Call(http.MethodGet, KlineEndpoint, &platforms.ObjectBody{
+		SymbolFiled: symbol,
+		"step":      interval,
+		"limit":     limit,
 	}, constants.None, &resp)
 	if err != nil {
 		return nil, err
@@ -94,7 +95,7 @@ func (c *Connector) GetServerTime() (int64, error) {
 	var resp = new(struct {
 		ServerTime int64 `json:"server_time"`
 	})
-	err := c.Call(http.MethodGet, ServerTimeEndpoint, map[string]interface{}{}, constants.None, resp)
+	err := c.Call(http.MethodGet, ServerTimeEndpoint, &platforms.ObjectBody{}, constants.None, resp)
 	return resp.ServerTime, err
 }
 
@@ -116,8 +117,8 @@ type TickerResp struct {
 
 func (c *Connector) GetTicker(symbol string) (types.TickerEntry, error) {
 	var resp = new(TickerResp)
-	err := c.Call(http.MethodGet, TickerEndpoint, map[string]interface{}{
-		"symbol": symbol,
+	err := c.Call(http.MethodGet, TickerEndpoint, &platforms.ObjectBody{
+		SymbolFiled: symbol,
 	}, constants.None, resp)
 	if err != nil {
 		return types.TickerEntry{}, err

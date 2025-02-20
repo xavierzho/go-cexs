@@ -67,10 +67,14 @@ type StreamClient interface {
 	Close() error
 	// SendMessage send json payload
 	SendMessage(payload map[string]any) error
-	// Reconnect reset connection
+	// ReadMessage read ws channel message
+	ReadMessage() ([]byte, error)
+	Reconnect
+}
+type Reconnect interface {
+	// Reconnect reset ws connection
 	Reconnect() error
 }
-
 type MarketStreamer interface {
 	DepthStream(ctx context.Context, symbol string, channel chan<- types.DepthEntry) error
 	CandleStream(ctx context.Context, symbol, interval string, channel chan<- types.CandleEntry) error
@@ -78,6 +82,7 @@ type MarketStreamer interface {
 
 type UserDataStreamer interface {
 	Login() error
+	Reconnect
 	OrderStream(ctx context.Context, channel chan<- types.OrderUpdateEntry) error
 	BalanceStream(ctx context.Context, channel chan<- types.BalanceUpdateEntry) error
 	AccountStream(ctx context.Context, channel chan<- types.AccountUpdateEntry) error

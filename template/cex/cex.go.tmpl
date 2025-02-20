@@ -21,6 +21,6 @@ func (c *Connector) SymbolPattern(symbol string) string {
 	panic("implement me")
 }
 
-func NewConnector(cred *platforms.Credentials, client *http.Client) platforms.Connector {
+func NewConnector(cred *platforms.Credentials, client *http.Client) platforms.SpotConnector {
 	return &Connector{Credentials: cred, Client: client}
 }

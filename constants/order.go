@@ -1,5 +1,6 @@
 package constants
 
+// OrderType unified order type
 type OrderType int
 
 const (
@@ -10,8 +11,10 @@ const (
 	StopLossLimit
 	TakeProfit
 	TakeProfitLimit
+	Iceberg
 )
 
+// OrderStatus unified order status
 type OrderStatus int
 
 const (

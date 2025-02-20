@@ -1,14 +1,16 @@
 package bitmart
 
 import (
-	"github.com/shopspring/decimal"
-	"github.com/xavierzho/go-cexs/constants"
-	"github.com/xavierzho/go-cexs/types"
+	"github.com/xavierzho/go-cexs/platforms"
 	"log"
 	"math"
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/shopspring/decimal"
+	"github.com/xavierzho/go-cexs/constants"
+	"github.com/xavierzho/go-cexs/types"
 )
 
 type OrderResponse struct {
@@ -28,8 +30,8 @@ func (c *Connector) MatchOrderType(state constants.OrderType) types.OrderTypeCon
 	}
 }
 func (c *Connector) PlaceOrder(order types.OrderEntry) (string, error) {
-	params := map[string]any{
-		"symbol":        order.Symbol,
+	params := &platforms.ObjectBody{
+		SymbolFiled:     order.Symbol,
 		"side":          strings.ToLower(order.Side),
 		"type":          c.MatchOrderType(order.Type).String(),
 		"timeInForce":   order.TimeInForce,
@@ -63,7 +65,7 @@ func (c *Connector) BatchOrder(params []types.OrderEntry) ([]string, error) {
 			"size":          arg.Quantity.StringFixed(1),
 			"price":         arg.Price.StringFixed(11),
 			"side":          strings.ToLower(arg.Side),
-			"symbol":        arg.Symbol,
+			SymbolFiled:     arg.Symbol,
 			"type":          c.MatchOrderType(arg.Type).String(),
 			"clientOrderId": arg.TradeNo,
 		}
@@ -83,8 +85,8 @@ func (c *Connector) BatchOrder(params []types.OrderEntry) ([]string, error) {
 
 		go func(i int, batchOrders []map[string]interface{}) {
 			defer wg.Done()
-			params := map[string]interface{}{
-				"symbol":      batchOrders[0]["symbol"],
+			params := &platforms.ObjectBody{
+				SymbolFiled:   batchOrders[0][SymbolFiled],
 				"orderParams": batchOrders,
 			}
 			var response BatchResponse
@@ -106,7 +108,7 @@ func (c *Connector) BatchOrder(params []types.OrderEntry) ([]string, error) {
 	return results, nil
 }
 
-type OrderStatusResponse struct {
+type QueryOrder struct {
 	Symbol         string `json:"symbol"`
 	Side           string `json:"side"`
 	Notional       string `json:"notional"`
@@ -124,9 +126,43 @@ type OrderStatusResponse struct {
 	State          string `json:"state"`
 }
 
+func (c *Connector) queryOrder(orderId string) (QueryOrder, error) {
+	var response QueryOrder
+	err := c.Call(http.MethodPost, QueryOrderEndpoint, &platforms.ObjectBody{
+		"order_id": orderId,
+	}, constants.Signed, &response)
+	if err != nil {
+		return QueryOrder{}, err
+	}
+	return response, nil
+}
+func (c *Connector) QueryOrder(_ string, orderId string) (types.QueryOrder, error) {
+	resp, err := c.queryOrder(orderId)
+	if err != nil {
+		return types.QueryOrder{}, err
+	}
+	price, _ := decimal.NewFromString(resp.Price)
+	amount, _ := decimal.NewFromString(resp.Size)
+	symbol, _ := constants.StandardizeSymbol(resp.Symbol)
+	filled, _ := decimal.NewFromString(resp.FilledSize)
+	return types.QueryOrder{
+		Symbol:     symbol,
+		Side:       strings.ToLower(resp.Side),
+		Type:       OrderType(resp.Type).Convert(),
+		Status:     OrderStatus(resp.State).Convert(),
+		Price:      price,
+		Quantity:   amount,
+		TradeNo:    resp.ClientOrderID,
+		OrderId:    resp.OrderID,
+		CreateTime: resp.CreateTime,
+		UpdateTime: resp.UpdateTime,
+		Filled:     filled,
+	}, nil
+}
+
 func (c *Connector) GetOrderStatus(_ string, orderId string) (constants.OrderStatus, error) {
-	var response OrderStatusResponse
-	err := c.Call(http.MethodPost, QueryOrderEndpoint, map[string]interface{}{
+	var response QueryOrder
+	err := c.Call(http.MethodPost, QueryOrderEndpoint, &platforms.ObjectBody{
 		"order_id": orderId,
 	}, constants.Signed, &response)
 	if err != nil {
@@ -138,9 +174,9 @@ func (c *Connector) GetOrderStatus(_ string, orderId string) (constants.OrderSta
 }
 
 func (c *Connector) PendingOrders(symbol string) ([]types.OpenOrderEntry, error) {
-	var response []OrderStatusResponse
-	err := c.Call(http.MethodPost, OpenOrdersEndpoint, map[string]interface{}{
-		"symbol": symbol,
+	var response []QueryOrder
+	err := c.Call(http.MethodPost, OpenOrdersEndpoint, &platforms.ObjectBody{
+		SymbolFiled: symbol,
 	}, constants.Signed, &response)
 	if err != nil {
 		return nil, err

@@ -14,17 +14,11 @@ import (
 	"strconv"
 )
 
-var ListenKeyEndpoint = RestAPI + "/api/v3/userDataStream"
+var listenKeyEndpoint = RestAPI + ListenKeyEndpoint
 
 type UserDataStream struct {
-	APIKey    string
-	APISecret string
-	base      *platforms.StreamBase
-
-	account chan StreamResponse[AccountUpdate]
-	balance chan StreamResponse[BalanceUpdate]
-	order   chan StreamResponse[OrderUpdate]
-	//expired chan map[string]any
+	base *platforms.StreamBase
+	*platforms.Credentials
 	listenKey string
 }
 
@@ -113,20 +107,16 @@ type StreamResponse[T Event] struct {
 	Data   T      `json:"data"`
 }
 
-func NewUserStream(apikey, apiSecret string) *UserDataStream {
+func NewUserStream(creds *platforms.Credentials) *UserDataStream {
 	return &UserDataStream{
-		APIKey:    apikey,
-		APISecret: apiSecret,
-		base:      platforms.NewStream(),
-		order:     make(chan StreamResponse[OrderUpdate], 100),
-		balance:   make(chan StreamResponse[BalanceUpdate], 100),
-		account:   make(chan StreamResponse[AccountUpdate], 100),
+		Credentials: creds,
+		base:        platforms.NewStream(),
 	}
 }
 
 // https://developers.binance.com/docs/binance-spot-api-docs/user-data-stream#create-a-listenkey-user_stream
 func (stream *UserDataStream) getListenKey() error {
-	req, err := http.NewRequest(http.MethodPost, ListenKeyEndpoint, nil)
+	req, err := http.NewRequest(http.MethodPost, listenKeyEndpoint, nil)
 	if err != nil {
 		return err
 	}
@@ -160,7 +150,7 @@ func (stream *UserDataStream) closeListenKey(key string) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest(http.MethodDelete, ListenKeyEndpoint, bytes.NewReader(bytesBody))
+	req, err := http.NewRequest(http.MethodDelete, listenKeyEndpoint, bytes.NewReader(bytesBody))
 	if err != nil {
 		return err
 	}
@@ -179,7 +169,7 @@ func (stream *UserDataStream) keepAlive(listenKey string) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest(http.MethodPut, ListenKeyEndpoint, bytes.NewReader(bytesBody))
+	req, err := http.NewRequest(http.MethodPut, listenKeyEndpoint, bytes.NewReader(bytesBody))
 	if err != nil {
 		return err
 	}
@@ -213,8 +203,6 @@ func (stream *UserDataStream) Reconnect() error {
 		log.Println("Reconnected successfully")
 
 		// 重新开始接收消息
-		go stream.listenMessages()
-
 		return nil
 	}
 
@@ -230,82 +218,7 @@ func (stream *UserDataStream) Login() error {
 	if err != nil {
 		return err
 	}
-	go stream.listenMessages()
 	return nil
-}
-
-func (stream *UserDataStream) listenMessages() {
-	for {
-		msg, err := stream.base.ReadMessage()
-		if err != nil {
-			log.Printf("Error reading WebSocket message: %v\n", err)
-			// 在连接失败时尝试重连
-			if err := stream.Reconnect(); err != nil {
-				log.Printf("Reconnect failed: %v\n", err)
-				return
-			}
-		}
-
-		//if err := json.Unmarshal(msg, &event); err != nil {
-		//	log.Printf("Error unmarshalling WebSocket message: %v\n", err)
-		//	continue
-		//}
-
-		// 根据事件类型分发处理
-		switch utils.Json.Get(msg, "data", "e").ToString() {
-		case "executionReport":
-			var event StreamResponse[OrderUpdate]
-			fmt.Println("order update ")
-			_ = utils.Json.Unmarshal(msg, &event)
-			select {
-			case stream.order <- event:
-			default:
-				fmt.Println("Failed to send order update to channel.")
-			}
-
-		case "outboundAccountPosition":
-			var event StreamResponse[AccountUpdate]
-
-			_ = utils.Json.Unmarshal(msg, &event)
-			select {
-			case stream.account <- event:
-				// Successfully sent account update
-			default:
-				fmt.Println("Failed to send account update to channel.")
-			}
-			//stream.account <- event
-		case "balanceUpdate":
-			var event StreamResponse[BalanceUpdate]
-
-			_ = utils.Json.Unmarshal(msg, &event)
-			select {
-			case stream.balance <- event:
-				// Successfully sent balance update
-			default:
-				fmt.Println("Failed to send balance update to channel.")
-			}
-			//stream.balance <- event
-		case "listenKeyExpired":
-			log.Println("ListenKey expired, reconnecting...")
-			// 当 listenKey 过期时，重新连接
-			if err := stream.Reconnect(); err != nil {
-				log.Printf("Failed to reconnect after listenKey expired: %v\n", err)
-				return
-			}
-		}
-	}
-}
-
-func (stream *UserDataStream) GetOrderUpdate() <-chan StreamResponse[OrderUpdate] {
-	return stream.order
-}
-
-func (stream *UserDataStream) GetAccountUpdate() <-chan StreamResponse[AccountUpdate] {
-	return stream.account
-}
-
-func (stream *UserDataStream) GetBalanceUpdate() <-chan StreamResponse[BalanceUpdate] {
-	return stream.balance
 }
 
 func (stream *UserDataStream) OrderStream(ctx context.Context, channel chan<- types.OrderUpdateEntry) error {

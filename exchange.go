@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func NewExchange(ex constants.Platform, apikey, apiSecret string, option *string) platforms.Connector {
+func NewExchange(ex constants.Platform, apikey, apiSecret string, option *string) platforms.SpotConnector {
 	switch ex {
 	case constants.Bitmart:
 		return bitmart.NewConnector(platforms.NewCredentials(apikey, apiSecret, option), &http.Client{})
@@ -33,7 +33,7 @@ func NewMarketStream(ex constants.Platform) platforms.MarketStreamer {
 func NewUserDataStream(ex constants.Platform, apikey, apiSecret string, option *string) platforms.UserDataStreamer {
 	switch ex {
 	case constants.Binance:
-		return binance.NewUserStream(apikey, apiSecret)
+		return binance.NewUserStream(platforms.NewCredentials(apikey, apiSecret, option))
 	case constants.Bitmart:
 		return bitmart.NewUserStream(platforms.NewCredentials(apikey, apiSecret, option))
 	default:

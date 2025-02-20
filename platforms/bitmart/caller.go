@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/xavierzho/go-cexs/platforms"
 	"io"
 	"net/http"
 	"strconv"
@@ -36,21 +37,29 @@ type Response struct {
 	Data    json.RawMessage `json:"data"`
 }
 
-func (c *Connector) Call(method string, route string, params map[string]interface{}, authType constants.AuthType,
+func (c *Connector) Call(method string, route string, params platforms.Serializer, authType constants.AuthType,
 	returnType any) error {
+	var err error
 	timestamp := time.Now()
 	header := http.Header{}
 	header.Add("Content-Type", "application/json")
 	header.Add("User-Agent", "bitmart-python-sdk-api/")
-	symbol, ok := params["symbol"]
+	symbol, ok := params.Exists(SymbolFiled)
 	if ok {
-		params["symbol"] = c.SymbolPattern(symbol.(string))
+		params.Set(SymbolFiled, c.SymbolPattern(symbol.(string)))
 	}
-	bodyData, _ := json.Marshal(params)
-	var body = bytes.NewBuffer(bodyData)
+	body, err := params.Serialize()
+	if err != nil {
+		return err
+	}
+	var bodyData = new(bytes.Buffer)
+	_, err = io.Copy(bodyData, body)
+	if err != nil {
+		return err
+	}
 	url := fmt.Sprintf("%s%s", RestAPI, route)
 
-	var req, err = http.NewRequest(method, url, nil)
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return err
 	}
@@ -59,7 +68,7 @@ func (c *Connector) Call(method string, route string, params map[string]interfac
 	} else {
 		header.Add("X-BM-KEY", c.APIKey)
 		header.Add("X-BM-TIMESTAMP", strconv.FormatInt(timestamp.UnixNano(), 10))
-		signature := c.Sign(preSign(timestamp, *c.Option, bodyData))
+		signature := c.Sign(preSign(timestamp, *c.Option, bodyData.Bytes()))
 		req.Header.Add("X-BM-SIGN", signature)
 	}
 

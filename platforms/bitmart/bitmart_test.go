@@ -2,22 +2,17 @@ package bitmart
 
 import (
 	"bytes"
-	"compress/flate"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"github.com/xavierzho/go-cexs/platforms"
-	"io/ioutil"
+	"github.com/xavierzho/go-cexs/types"
 	"log"
 	"testing"
+	"time"
 )
 
-func zipDecode(in []byte) ([]byte, error) {
-	reader := flate.NewReader(bytes.NewReader(in))
-	defer reader.Close()
-
-	return ioutil.ReadAll(reader)
-}
 func TestWsConnect(t *testing.T) {
 	const url = "wss://ws-manager-compress.bitmart.com/api?protocol=1.1"
 	const private = "wss://ws-manager-compress.bitmart.com/user?protocol=1.1"
@@ -73,4 +68,35 @@ func TestStreamSign(t *testing.T) {
 	if signed != signature {
 		t.Errorf("no match %s-%s", signed, signature)
 	}
+}
+
+func TestMarketStream(t *testing.T) {
+	stream := NewMarketStream()
+	ctx, cancel := context.WithCancel(context.Background())
+	var symbol = "BTCUSDT"
+	var candles = make(chan types.CandleEntry)
+	err := stream.CandleStream(ctx, symbol, "1m", candles)
+	if err != nil {
+		t.Error(err)
+	}
+	var depths = make(chan types.DepthEntry)
+	stream2 := NewMarketStream()
+	err = stream2.DepthStream(ctx, symbol, depths)
+	if err != nil {
+		t.Error(err)
+	}
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case candle := <-candles:
+				fmt.Println(symbol, candle)
+			case depth := <-depths:
+				fmt.Println(symbol, depth)
+			}
+		}
+	}()
+	time.Sleep(10 * time.Second)
+	cancel()
 }

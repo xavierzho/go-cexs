@@ -51,7 +51,7 @@ type AccountResp struct {
 func (c *Connector) AccountInfo() (*AccountResp, error) {
 	var account = new(AccountResp)
 
-	err := c.Call(http.MethodGet, AccountEndpoint, map[string]any{}, constants.Signed, account)
+	err := c.Call(http.MethodGet, AccountEndpoint, &platforms.ObjectBody{}, constants.Signed, account)
 	return account, err
 }
 
