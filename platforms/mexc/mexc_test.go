@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/xavierzho/go-cexs/platforms"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -52,7 +53,61 @@ func TestMarketStream(t *testing.T) {
 }
 
 func TestUserDataStream(t *testing.T) {
+	apikey := os.Getenv("MexcAPIKEY")
+	secret := os.Getenv("MexcSECRET")
+	//fmt.Println(apikey, secret)
+	stream := NewUserStream(platforms.NewCredentials(apikey, secret, nil))
+	err := stream.Login()
+	if err != nil {
 
-	stream := NewUserStream(platforms.NewCredentials("mx0vglqaFSgIoT4AG1", "69b258384be14fa3a6401370eb1c94d5", nil))
-	stream.Login()
+		t.Errorf("login failed: %s", err)
+		return
+	}
+	stream1 := NewUserStream(platforms.NewCredentials(apikey, secret, nil))
+	err = stream1.Login()
+	if err != nil {
+		t.Errorf("login1 failed: %s", err)
+	}
+	//var balanceChan = make(chan types.BalanceUpdateEntry)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	//err = stream.BalanceStream(ctx, balanceChan)
+	//if err != nil {
+	//	fmt.Println("balance stream", err)
+	//	return
+	//}
+	//for {
+	//	select {
+	//	case bal := <-balanceChan:
+	//		fmt.Println(bal)
+	//
+	//	}
+	//}
+	var orderChan = make(chan types.OrderUpdateEntry)
+	err = stream.OrderStream(ctx, orderChan)
+	if err != nil {
+		fmt.Println("order stream", err)
+		return
+	}
+	var placeChan = make(chan types.OrderUpdateEntry)
+	err = stream1.(*UserDataStream).PlaceStream(ctx, placeChan)
+	if err != nil {
+		fmt.Println("place stream", err)
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case order := <-orderChan:
+			fmt.Println("order", order)
+			continue
+		case place := <-placeChan:
+			fmt.Println("place", place)
+			continue
+			//case bal := <-balanceChan:
+			//	fmt.Println(bal)
+
+		}
+	}
 }

@@ -24,7 +24,10 @@ func (c *Connector) Call(method string, route string, params platforms.Serialize
 	// Add necessary parameters
 	var body io.Reader
 	var err error
-
+	symbol, ok := params.Exists("instId")
+	if ok {
+		params.Set("instId", c.SymbolPattern(symbol.(string)))
+	}
 	headers := http.Header{}
 	headers.Set("OK-ACCESS-KEY", c.APIKey)
 	headers.Set("OK-ACCESS-PASSPHRASE", *c.Option)
@@ -32,13 +35,15 @@ func (c *Connector) Call(method string, route string, params platforms.Serialize
 	headers.Set("OK-ACCESS-TIMESTAMP", timestamp)
 	headers.Set("Content-Type", "application/json")
 	prevSign := fmt.Sprintf("%s%s%s", timestamp, method, route)
-
+	url := RestAPI + route
 	if method == http.MethodGet {
 		query, err := params.EncodeQuery()
 		if err != nil {
 			return err
 		}
-		prevSign += fmt.Sprintf("?%s", query)
+		q := fmt.Sprintf("?%s", query)
+		prevSign += q
+		url += q
 	} else if method == http.MethodPost {
 		var bodyBytes = new(bytes.Buffer)
 		body, err = params.Serialize()
@@ -54,8 +59,8 @@ func (c *Connector) Call(method string, route string, params platforms.Serialize
 		prevSign += fmt.Sprintf("%s", bodyBytes.Bytes())
 	}
 	headers.Set("OK-ACCESS-SIGN", c.Sign([]byte(prevSign)))
-
-	req, err := http.NewRequest(method, RestAPI+route, body)
+	fmt.Println(url)
+	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return err
 	}
@@ -68,6 +73,9 @@ func (c *Connector) Call(method string, route string, params platforms.Serialize
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("[Okx] bad status code: %d", resp.StatusCode)
 	}
 	return json.Unmarshal(respBody, returnType)
 }

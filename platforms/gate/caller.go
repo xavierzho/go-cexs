@@ -24,18 +24,18 @@ func (c *Connector) Sign(params []byte) string {
 // Call Reference https://www.gate.io/docs/developers/apiv4/#apiv4-signed-request-requirements
 func (c *Connector) Call(method string, route string, params platforms.Serializer, authType constants.AuthType, returnType interface{}) error {
 	// Add necessary parameters
+	var body io.Reader
 	symbol, ok := params.Exists(SymbolFiled)
 	if ok {
 		params.Set(SymbolFiled, c.SymbolPattern(symbol.(string)))
 	}
-	bytesBody, err := utils.Json.Marshal(params)
+	bodyData, err := params.Serialize()
 	if err != nil {
 		return err
 	}
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 	sha := sha512.New()
-	sha.Write(bytesBody)
-	reqBody := bytes.NewReader(bytesBody)
+	_, _ = io.Copy(sha, bodyData)
 	queryString := ""
 	switch method {
 	case http.MethodDelete, http.MethodGet:
@@ -44,8 +44,11 @@ func (c *Connector) Call(method string, route string, params platforms.Serialize
 			return err
 		}
 		queryString = query
+	case http.MethodPost:
+		body = bodyData
 	}
-	req, err := http.NewRequest(method, fmt.Sprintf("%s%s?%s", RestAPI, route, queryString), reqBody)
+	url := fmt.Sprintf("%s%s?%s", RestAPI, route, queryString)
+	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return err
 	}
@@ -82,7 +85,7 @@ func (c *Connector) Call(method string, route string, params platforms.Serialize
 		return err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("")
+		return fmt.Errorf("[Gate] Response %s", resp.Status)
 	}
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

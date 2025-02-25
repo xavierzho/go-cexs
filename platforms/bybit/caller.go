@@ -23,11 +23,13 @@ func (c *Connector) Sign(params []byte) string {
 
 func (c *Connector) Call(method string, route string, params platforms.Serializer, authType constants.AuthType, returnType any) error {
 	// Add necessary parameters
-	bytesBody, err := json.Marshal(params)
-	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
+	var body io.Reader
+	bodyData, err := params.Serialize()
 	if err != nil {
 		return err
 	}
+	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
+
 	recvWindow := "5000"
 	var signData = new(bytes.Buffer)
 	signData.WriteString(timestamp)
@@ -38,8 +40,12 @@ func (c *Connector) Call(method string, route string, params platforms.Serialize
 
 	url := RestAPI + route
 	if method == http.MethodPost {
-		signData.Write(bytesBody)
-
+		//signData.Write(bodyData)
+		_, err = signData.ReadFrom(bodyData)
+		if err != nil {
+			return err
+		}
+		body = bodyData
 	} else {
 		queryString, err := params.EncodeQuery()
 		if err != nil {
@@ -48,7 +54,6 @@ func (c *Connector) Call(method string, route string, params platforms.Serialize
 		signData.WriteString(queryString)
 		url = fmt.Sprintf("%s?%s", url, queryString)
 	}
-
 	if authType == constants.Signed {
 		// must sign
 		header.Set(signTypeKey, "2")
@@ -59,7 +64,7 @@ func (c *Connector) Call(method string, route string, params platforms.Serialize
 		header.Set(signatureKey, signature)
 	}
 
-	req, err := http.NewRequest(method, url, bytes.NewReader(bytesBody))
+	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return err
 	}
@@ -72,6 +77,10 @@ func (c *Connector) Call(method string, route string, params platforms.Serialize
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
+	}
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("[Bitmart] Response %s", resp.Status)
 	}
 	return json.Unmarshal(respBody, returnType)
 }

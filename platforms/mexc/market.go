@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func (c *Connector) GetOrderBook(symbol string, depth *int64) (*types.OrderBookEntry, error) {
+func (c *Connector) GetOrderBook(symbol string, depth *int64) (types.OrderBookEntry, error) {
 	var resp = new(struct {
 		LastUpdateId int        `json:"lastUpdateId"`
 		Bids         [][]string `json:"bids"`
@@ -22,9 +22,9 @@ func (c *Connector) GetOrderBook(symbol string, depth *int64) (*types.OrderBookE
 		"limit":     depth,
 	}, constants.None, resp)
 	if err != nil {
-		return nil, err
+		return types.OrderBookEntry{}, err
 	}
-	return &types.OrderBookEntry{
+	return types.OrderBookEntry{
 		Bids:      resp.Bids,
 		Asks:      resp.Asks,
 		Symbol:    symbol,
@@ -32,7 +32,7 @@ func (c *Connector) GetOrderBook(symbol string, depth *int64) (*types.OrderBookE
 	}, nil
 }
 
-func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.CandleEntry, error) {
+func (c *Connector) GetCandles(symbol, interval string, limit int64) (types.CandlesEntry, error) {
 	var resp [][]any
 	err := c.Call(http.MethodGet, CandleEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
@@ -43,15 +43,13 @@ func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.Ca
 		return nil, err
 	}
 
-	var keys = []string{
-		"time_start", "open", "high", "low", "close", "volume", "time_close", "value_usd",
-	}
-	var result []types.CandleEntry
-	for _, kline := range resp {
-		var candle = new(types.CandleEntry)
-
-		candle.FromList(kline, keys)
-		result = append(result, *candle)
+	var result = make(types.CandlesEntry, len(resp))
+	for i, kline := range resp {
+		list := append(resp[:6], resp[7])
+		result[i] = make(types.CandleEntry, len(list))
+		for j, a := range kline {
+			result[i][j] = types.Safe2Float(a)
+		}
 	}
 	return result, nil
 }

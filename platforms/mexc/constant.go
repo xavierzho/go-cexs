@@ -83,3 +83,21 @@ func (o OrderStatus) Convert() constants.OrderStatus {
 		return constants.Error
 	}
 }
+
+type ChangeType string
+
+const (
+	Deposit          ChangeType = "DEPOSIT"
+	DepositFee       ChangeType = "DEPOSIT_FEE"
+	ContractTransfer ChangeType = "CONTRACT_TRANSFER"
+	InternalTransfer ChangeType = "INTERNAL_TRANSFER"
+	Withdraw         ChangeType = "WITHDRAW"
+	WithdrawFee      ChangeType = "WITHDRAW_FEE"
+	Entrust          ChangeType = "ENTRUST"
+	EntrustPlace     ChangeType = "ENTRUST_PLACE"
+	EntrustCancel    ChangeType = "ENTRUST_CANCEL"
+	TradeFee         ChangeType = "TRADE_FEE"
+	EntrustUnfrozen  ChangeType = "ENTRUST_UNFROZEN"
+	Airdrop          ChangeType = "SUGAR"
+	EtfIndex         ChangeType = "ETF_INDEX"
+)

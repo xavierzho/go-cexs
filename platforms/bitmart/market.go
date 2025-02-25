@@ -5,6 +5,7 @@ import (
 	"github.com/xavierzho/go-cexs/constants"
 	"github.com/xavierzho/go-cexs/platforms"
 	"github.com/xavierzho/go-cexs/types"
+	"github.com/xavierzho/go-cexs/utils"
 	"net/http"
 	"strconv"
 )
@@ -45,7 +46,7 @@ type OrderBookResponse struct {
 	Price     string     `json:"price"`  // The price at current depth
 }
 
-func (c *Connector) GetOrderBook(symbol string, limit *int64) (*types.OrderBookEntry, error) {
+func (c *Connector) GetOrderBook(symbol string, limit *int64) (types.OrderBookEntry, error) {
 	var response OrderBookResponse
 	if limit == nil {
 		*limit = 30
@@ -55,13 +56,13 @@ func (c *Connector) GetOrderBook(symbol string, limit *int64) (*types.OrderBookE
 		"limit":     limit,
 	}, constants.None, &response)
 	if err != nil {
-		return nil, err
+		return types.OrderBookEntry{}, err
 	}
 	ts, err := strconv.ParseInt(response.Timestamp, 10, 64)
 	if err != nil {
-		return nil, err
+		return types.OrderBookEntry{}, err
 	}
-	return &types.OrderBookEntry{
+	return types.OrderBookEntry{
 		Symbol:    symbol,
 		Asks:      response.Asks,
 		Bids:      response.Bids,
@@ -69,26 +70,29 @@ func (c *Connector) GetOrderBook(symbol string, limit *int64) (*types.OrderBookE
 	}, nil
 }
 
-func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.CandleEntry, error) {
-	var resp [][]any
-	err := c.Call(http.MethodGet, KlineEndpoint, &platforms.ObjectBody{
-		SymbolFiled: symbol,
-		"step":      interval,
-		"limit":     limit,
-	}, constants.None, &resp)
+func (c *Connector) GetCandles(symbol, interval string, limit int64) (types.CandlesEntry, error) {
+	var klines [][]any
+	sec, err := utils.ToSeconds(interval)
 	if err != nil {
 		return nil, err
 	}
-	var keys = []string{
-		"time_start", "open", "high", "low", "close", "volume", "volume_usd",
+	err = c.Call(http.MethodGet, KlineEndpoint, &platforms.ObjectBody{
+		SymbolFiled: symbol,
+		"step":      sec / 60,
+		"limit":     limit,
+	}, constants.None, &klines)
+	if err != nil {
+		return nil, err
 	}
-	var result []types.CandleEntry
-	for _, kline := range resp {
-		var candle = new(types.CandleEntry)
-		candle.FromList(kline, keys)
-		result = append(result, *candle)
+
+	var candles = make(types.CandlesEntry, len(klines))
+	for i, kline := range klines {
+		candles[i] = make([]float64, len(kline))
+		for j, v := range kline {
+			candles[i][j] = types.Safe2Float(v)
+		}
 	}
-	return result, nil
+	return candles, nil
 }
 
 func (c *Connector) GetServerTime() (int64, error) {

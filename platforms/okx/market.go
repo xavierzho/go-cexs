@@ -19,7 +19,7 @@ func (o OrderBook) String() string {
 	return o.Timestamp
 }
 
-func (c *Connector) GetOrderBook(symbol string, depth *int64) (*types.OrderBookEntry, error) {
+func (c *Connector) GetOrderBook(symbol string, depth *int64) (types.OrderBookEntry, error) {
 	var resp RestReturn[OrderBook]
 	if depth == nil {
 		*depth = 30
@@ -29,10 +29,10 @@ func (c *Connector) GetOrderBook(symbol string, depth *int64) (*types.OrderBookE
 		"sz":     *depth,
 	}, constants.None, &resp)
 	if err != nil {
-		return nil, err
+		return types.OrderBookEntry{}, err
 	}
 	ts, _ := strconv.ParseInt(resp.Data[0].Timestamp, 10, 64)
-	return &types.OrderBookEntry{
+	return types.OrderBookEntry{
 		Asks:      resp.Data[0].Asks,
 		Bids:      resp.Data[0].Bids,
 		Symbol:    symbol,
@@ -45,9 +45,9 @@ type Candle []any
 func (Candle) String() string {
 	return ""
 }
-func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.CandleEntry, error) {
+func (c *Connector) GetCandles(symbol, interval string, limit int64) (types.CandlesEntry, error) {
 	var resp RestReturn[Candle]
-	var result []types.CandleEntry
+
 	err := c.Call(http.MethodGet, CandleRealTimeEndpoint, &platforms.ObjectBody{
 		"instId": symbol,
 		"limit":  limit,
@@ -56,11 +56,13 @@ func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.Ca
 	if err != nil {
 		return nil, err
 	}
-	var keys = []string{"time_start", "open", "high", "low", "close", "volume", "is_close"}
-	for _, kline := range resp.Data {
-		var candle = new(types.CandleEntry)
-		candle.FromList(kline, keys)
-		result = append(result, *candle)
+	var result = make(types.CandlesEntry, len(resp.Data))
+	for i, k := range resp.Data {
+		list := append(k[:7])
+		result[i] = make(types.CandleEntry, len(list))
+		for j, a := range list {
+			result[i][j] = types.Safe2Float(a)
+		}
 	}
 	return result, nil
 }

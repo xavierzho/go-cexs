@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/shopspring/decimal"
 	"github.com/xavierzho/go-cexs/constants"
@@ -75,6 +76,7 @@ func (c *Connector) PlaceOrder(params types.OrderEntry) (string, error) {
 		"timeInForce":      GTC.String(),
 		"newClientOrderId": params.TradeNo,
 		"newOrderRespType": NewOrderRespTypeFULL,
+		TimeFiled:          time.Now().UnixMilli(),
 	}, constants.Signed, resp)
 
 	return strconv.FormatInt(resp.OrderId, 10), err
@@ -139,6 +141,7 @@ func (c *Connector) Cancel(symbol, orderId string) (bool, error) {
 	err = c.Call(http.MethodDelete, OrderEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
 		"orderId":   od,
+		TimeFiled:   time.Now().UnixMilli(),
 	}, constants.Signed, resp)
 	if err != nil {
 		return false, err
@@ -152,6 +155,7 @@ func (c *Connector) Cancel(symbol, orderId string) (bool, error) {
 func (c *Connector) CancelAll(symbol string) error {
 	return c.Call(http.MethodDelete, OpenOrdersEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
+		TimeFiled:   time.Now().UnixMilli(),
 	}, constants.Signed, nil)
 }
 
@@ -171,6 +175,7 @@ func (c *Connector) queryOrder(symbol, orderId string) (*QueryOrder, error) {
 	err := c.Call(http.MethodGet, OrderEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
 		"orderId":   orderId,
+		TimeFiled:   time.Now().UnixMilli(),
 	}, constants.Signed, resp)
 	if err != nil {
 		return nil, err
@@ -234,6 +239,7 @@ func (c *Connector) PendingOrders(symbol string) ([]types.OpenOrderEntry, error)
 	var openOrders []OpenOrder
 	err := c.Call(http.MethodGet, OpenOrdersEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
+		TimeFiled:   time.Now().UnixMilli(),
 	}, constants.Signed, &openOrders)
 	if err != nil {
 		return nil, err

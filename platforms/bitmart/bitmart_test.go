@@ -100,3 +100,19 @@ func TestMarketStream(t *testing.T) {
 	time.Sleep(10 * time.Second)
 	cancel()
 }
+
+func TestGetCandles(t *testing.T) {
+
+	var symbol = "BTCUSDT"
+	opt := ""
+	cex := NewConnector(&platforms.Credentials{
+		APIKey:    "",
+		APISecret: "",
+		Option:    &opt,
+	}, nil)
+	candles, err := cex.GetCandles(symbol, "1m", 200)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(candles)
+}

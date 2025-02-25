@@ -3,6 +3,8 @@ package bybit
 import (
 	"context"
 	"fmt"
+	"github.com/xavierzho/go-cexs/platforms"
+	"net/http"
 	"testing"
 	"time"
 
@@ -38,4 +40,18 @@ func TestMarketStream(t *testing.T) {
 	}()
 	time.Sleep(10 * time.Second)
 	cancel()
+}
+
+func TestGetCandles(t *testing.T) {
+	cred := &platforms.Credentials{
+		APIKey:    "",
+		APISecret: "",
+	}
+	cex := NewConnector(cred, http.DefaultClient)
+
+	candles, err := cex.GetCandles("BTCUSDT", "1m", 200)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(candles)
 }

@@ -3,6 +3,9 @@ package okx
 import (
 	"context"
 	"fmt"
+	"github.com/xavierzho/go-cexs/platforms"
+	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -43,4 +46,20 @@ func TestMarketStream(t *testing.T) {
 func TestTime(t *testing.T) {
 	ts := time.Now().Format("2006-01-02T15:04:05.999Z")
 	fmt.Println(ts)
+}
+
+func TestGetCandles(t *testing.T) {
+	tmp := os.Getenv("OkxOption")
+	cred := &platforms.Credentials{
+		APISecret: os.Getenv("OkxAPIKEY"),
+		APIKey:    os.Getenv("OkxSECRET"),
+		Option:    &tmp,
+	}
+	fmt.Println(*cred)
+	cex := NewConnector(cred, http.DefaultClient)
+	candles, err := cex.GetCandles("BTCUSDT", "1m", 200)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(candles)
 }

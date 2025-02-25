@@ -16,6 +16,9 @@ func (c *Connector) Name() constants.Platform {
 }
 
 func NewConnector(base *platforms.Credentials, client *http.Client) platforms.SpotConnector {
+	if client == nil {
+		client = http.DefaultClient
+	}
 	return &Connector{Credentials: base, Client: client}
 }
 

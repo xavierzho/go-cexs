@@ -49,9 +49,8 @@ func (stream *UserDataStream) closeListenKey(listenKey string) {
 func (stream *UserDataStream) request(method string, params map[string]any) ([]byte, error) {
 	params["timestamp"] = time.Now().UnixMilli()
 	queryString := utils.EncodeParams(params)
-
 	signature := stream.Sign([]byte(queryString))
-	req, err := http.NewRequest(method, fmt.Sprintf("%s?%s&signature=%s", listenKeyEndpoint, params, signature), nil)
+	req, err := http.NewRequest(method, fmt.Sprintf("%s?%s&signature=%s", listenKeyEndpoint, queryString, signature), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -123,32 +122,35 @@ func (stream *UserDataStream) Reconnect() error {
 	return fmt.Errorf("failed to reconnect after %d attempts", 3)
 }
 
-type OrderUpdate struct {
-	RemainAmount       string `json:"A"`
-	CreateTime         int64  `json:"O"`
-	Side               int    `json:"S"` // 1= buy 2= sell
-	RemainQuantity     string `json:"V"`
-	Amount             string `json:"a"`
-	TradeNo            string `json:"c"`
-	OrderId            string `json:"i"`
-	IsMaker            int    `json:"m"`
-	OrderType          int    `json:"o"` // LIMIT_ORDER(1),POST_ONLY(2),IMMEDIATE_OR_CANCEL(3), FILL_OR_KILL(4),MARKET_ORDER(5);STOP_LIMIT(100)
-	Price              string `json:"p"`
-	Status             int    `json:"s"`
-	Quantity           string `json:"v"`
-	AvgPrice           string `json:"ap"`
-	CumulativeQuantity string `json:"cv"`
-	CumulativeAmount   string `json:"ca"`
+type PlaceUpdate struct {
+	RemainAmount       string  `json:"A,omitempty"`
+	CreateTime         int64   `json:"O,omitempty"`
+	Side               int64   `json:"S"` // 1= buy 2= sell
+	RemainQuantity     string  `json:"V,omitempty"`
+	Amount             string  `json:"a,omitempty"`
+	TradeNo            string  `json:"c,omitempty"`
+	OrderId            string  `json:"i"`
+	IsMaker            int     `json:"m,omitempty"`
+	OrderType          int     `json:"o"` // LIMIT_ORDER(1),POST_ONLY(2),IMMEDIATE_OR_CANCEL(3), FILL_OR_KILL(4),MARKET_ORDER(5);STOP_LIMIT(100)
+	Price              string  `json:"p"`
+	Status             int64   `json:"s"`
+	Quantity           string  `json:"v"`
+	AvgPrice           string  `json:"ap,omitempty"`
+	CumulativeQuantity string  `json:"cv,omitempty"`
+	CumulativeAmount   string  `json:"ca,omitempty"`
+	FeeAsset           string  `json:"N,omitempty"`
+	TiggerPrice        float64 `json:"P,omitempty"`
+	TiggerSide         int     `json:"T,omitempty"`
 }
 
-func (d OrderUpdate) GetSymbol() string {
+func (d PlaceUpdate) GetSymbol() string {
 	return ""
 }
 
 func (stream *UserDataStream) OrderStream(ctx context.Context, channel chan<- types.OrderUpdateEntry) error {
 	err := stream.base.SendMessage(map[string]any{
 		"method": SubscribeOp,
-		"params": []string{"spot@private.orders.v3.api"},
+		"params": []string{"spot@private.deals.v3.api"},
 	})
 	if err != nil {
 		return err
@@ -160,29 +162,18 @@ func (stream *UserDataStream) OrderStream(ctx context.Context, channel chan<- ty
 			default:
 				msg, err := stream.base.ReadMessage()
 				if err != nil {
+					fmt.Println("order error:", err)
 					continue
 				}
+				fmt.Printf("%s\n", msg)
 				var resp StreamResp[OrderUpdate]
 
 				_ = utils.Json.Unmarshal(msg, &resp)
-				var status constants.OrderStatus = constants.Error
-
-				switch resp.Data.Status {
-				case 1:
-					status = constants.Open
-				case 2:
-					status = constants.Filled
-				case 3:
-					status = constants.PartiallyFilled
-				case 4:
-					status = constants.Canceled
-				case 5:
-					status = constants.PartiallyCanceled
-				}
+				fmt.Printf("order %+v\n", resp)
 				channel <- types.OrderUpdateEntry{
 					OrderId:       resp.Data.OrderId,
 					ClientOrderId: resp.Data.TradeNo,
-					Status:        status,
+					Status:        constants.Filled,
 				}
 			}
 		}
@@ -191,13 +182,13 @@ func (stream *UserDataStream) OrderStream(ctx context.Context, channel chan<- ty
 }
 
 type BalanceUpdate struct {
-	Asset      string `json:"a"`
-	Timestamp  int64  `json:"c"`
-	Free       string `json:"f"`
-	LockChange string `json:"ld"`
-	Lock       string `json:"l"`
-	FreeChange string `json:"fd"`
-	Type       string `json:"o"`
+	Asset      string     `json:"a"`
+	Timestamp  int64      `json:"c"`
+	Free       string     `json:"f"`
+	LockChange string     `json:"ld"`
+	Lock       string     `json:"l"`
+	FreeChange string     `json:"fd"`
+	Type       ChangeType `json:"o"`
 }
 
 func (BalanceUpdate) GetSymbol() string {
@@ -226,15 +217,21 @@ func (stream *UserDataStream) BalanceStream(ctx context.Context, channel chan<- 
 				var resp StreamResp[BalanceUpdate]
 
 				_ = utils.Json.Unmarshal(msg, &resp)
+				switch resp.Data.Type {
+				case InternalTransfer, ContractTransfer, Deposit, Withdraw, WithdrawFee, DepositFee:
+					//fmt.Printf("%+v\n", resp.Data)
+					channel <- types.BalanceUpdateEntry{}
+				default:
+					continue
+				}
 
-				channel <- types.BalanceUpdateEntry{}
 			}
 		}
 	}()
 	return nil
 }
 
-type AccountUpdate struct {
+type OrderUpdate struct {
 	Price           string `json:"p"`
 	Amount          string `json:"a"`
 	IsSelfTrade     int    `json:"st"`
@@ -249,7 +246,7 @@ type AccountUpdate struct {
 	CommissionAsset string `json:"N"`
 }
 
-func (AccountUpdate) GetSymbol() string {
+func (OrderUpdate) GetSymbol() string {
 	return ""
 }
 
@@ -272,15 +269,68 @@ func (stream *UserDataStream) AccountStream(ctx context.Context, channel chan<- 
 					continue
 				}
 
-				var resp StreamResp[AccountUpdate]
+				var resp StreamResp[BalanceUpdate]
 				_ = utils.Json.Unmarshal(msg, &resp)
-				channel <- types.AccountUpdateEntry{}
+				switch resp.Data.Type {
+				case Entrust, EntrustCancel, EntrustPlace, EntrustUnfrozen, Airdrop, EtfIndex, TradeFee:
+					channel <- types.AccountUpdateEntry{}
+				default:
+					continue
+				}
 			}
 		}
 	}()
 	return nil
 }
 
+func (stream *UserDataStream) PlaceStream(ctx context.Context, channel chan<- types.OrderUpdateEntry) error {
+	err := stream.base.SendMessage(map[string]any{
+		"method": SubscribeOp,
+		"params": []string{
+			"spot@private.orders.v3.api",
+		},
+	})
+	if err != nil {
+		return err
+	}
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				msg, err := stream.base.ReadMessage()
+				if err != nil {
+					fmt.Println("place error: ", err)
+					continue
+				}
+				fmt.Printf("%s\n", msg)
+				var resp StreamResp[PlaceUpdate]
+				_ = utils.Json.Unmarshal(msg, &resp)
+				fmt.Printf("place %+v\n", resp)
+				var status constants.OrderStatus = constants.Error
+				switch resp.Data.Status {
+				case 1:
+					status = constants.Open
+				case 2:
+					status = constants.Filled
+				case 3:
+					status = constants.PartiallyFilled
+				case 4:
+					status = constants.Canceled
+				case 5:
+					status = constants.PartiallyCanceled
+				}
+				channel <- types.OrderUpdateEntry{
+					OrderId:       resp.Data.OrderId,
+					ClientOrderId: resp.Data.TradeNo,
+					Status:        status,
+				}
+			}
+		}
+	}()
+	return nil
+}
 func NewUserStream(cred *platforms.Credentials) platforms.UserDataStreamer {
 	return &UserDataStream{
 		base:        platforms.NewStream(),

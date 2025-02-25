@@ -2,18 +2,19 @@ package binance
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/xavierzho/go-cexs/platforms"
 	"log"
 	"net/url"
 	"os"
 	"sort"
 	"testing"
-
-	"github.com/xavierzho/go-cexs/platforms"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -78,7 +79,20 @@ func TestWsLogin(t *testing.T) {
 	}
 
 	_ = stream.Login()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var orders = make(chan types.OrderUpdateEntry)
+	err = stream.OrderStream(ctx, orders)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	for {
+		select {
+		case order := <-orders:
+			fmt.Printf("%+v\n", order)
+		}
+	}
 }
 func encodeValues(v url.Values) []byte {
 	if v == nil {
@@ -167,4 +181,77 @@ func TestOrder(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestGetData(t *testing.T) {
+	symbol := "BTCUSDT"
+
+	stream := NewMarketStream()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	defer cancel()
+	var candles = make(chan types.CandleEntry)
+	err := stream.CandleStream(ctx, symbol, "1m", candles)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	stream2 := NewMarketStream()
+
+	var depths = make(chan types.DepthEntry)
+	err = stream2.DepthStream(ctx, symbol, depths)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case entry := <-candles:
+			fmt.Printf("Candle[%s]%+v\n", symbol, entry)
+		case depth := <-depths:
+			fmt.Printf("Depth[%s]%+v\n", symbol, depth)
+		}
+	}
+}
+
+func TestGetCandles(t *testing.T) {
+	symbol := "BTCUSDT"
+	cred := &platforms.Credentials{
+		APIKey:    os.Getenv("BinanceAPIKEY"),
+		APISecret: os.Getenv("BinanceSERCET"),
+	}
+	conn := NewConnector(cred, nil)
+	candles, err := conn.GetCandles(symbol, "30m", 200)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	data, _ := json.Marshal(candles[:14])
+	fmt.Printf("%s\n", data)
+}
+
+func TestFloat(t *testing.T) {
+	data := []any{
+		1499040000000,       // 开盘时间
+		"0.01634790",        // 开盘价
+		"0.80000000",        // 最高价
+		"0.01575800",        // 最低价
+		"0.01577100",        // 收盘价(当前K线未结束的即为最新价)
+		"148976.11427815",   // 成交量
+		1499644799999,       // 收盘时间
+		"2434.19055334",     // 成交额
+		308,                 // 成交笔数
+		"1756.87402397",     // 主动买入成交量
+		"28.46694368",       // 主动买入成交额
+		"17928899.62484339", // 请忽略该参数
+	}
+	for _, i := range append(data[:6], data[7]) {
+		f := types.Safe2Float(i)
+		fmt.Println(i, " -> ", f)
+	}
+
+	fmt.Println(time.Now().UnixMilli())
 }

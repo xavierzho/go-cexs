@@ -53,9 +53,6 @@ func (stream *MarketStream) CandleStream(ctx context.Context, symbol, interval s
 		return err
 	}
 
-	var keys = []string{
-		"time_start", "open", "high", "low", "close", "volume",
-	}
 	go func() {
 		for {
 			select {
@@ -69,10 +66,19 @@ func (stream *MarketStream) CandleStream(ctx context.Context, symbol, interval s
 				var event StreamResp[CandleUpdate]
 
 				_ = utils.Json.Unmarshal(msg, &event)
-				for _, datum := range event.Data {
-					var candle = new(types.CandleEntry)
-					candle.FromList(datum.Candle, keys)
-					channel <- *candle
+				for _, d := range event.Data {
+					//var candle = new(types.CandleEntry)
+					//candle.FromList(datum.Candle, keys)
+					k := d.Candle
+					var candle = make([]float64, len(k))
+					for i, v := range k {
+						f := types.Safe2Float(v)
+						if i == 0 {
+							f *= 1000
+						}
+						candle[i] = f
+					}
+					channel <- candle
 				}
 
 			}

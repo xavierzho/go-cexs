@@ -49,7 +49,7 @@ type DepthEvent struct {
 	Asks    [][]string `json:"a"`
 }
 
-func NewMarketStream() *MarketStream {
+func NewMarketStream() platforms.MarketStreamer {
 	return &MarketStream{
 		StreamBase: platforms.NewStream(),
 	}
@@ -85,15 +85,12 @@ func (stream *MarketStream) CandleStream(ctx context.Context, symbol, interval s
 				var event StreamResponse[CandleEvent]
 				_ = utils.Json.Unmarshal(msg, &event)
 				k := event.Data.Kline
-				channel <- types.CandleEntry{
-					"open":       k.Open,
-					"high":       k.High,
-					"low":        k.Low,
-					"close":      k.Close,
-					"volume":     k.Volume,
-					"time_start": k.StartTime,
-					"time_end":   k.EndTime,
+				var line = []any{k.StartTime, k.Open, k.High, k.Low, k.Close, k.Volume, k.QuoteVolume}
+				var result = make(types.CandleEntry, len(line))
+				for i, a := range line {
+					result[i] = types.Safe2Float(a)
 				}
+				channel <- result
 			}
 		}
 	}()

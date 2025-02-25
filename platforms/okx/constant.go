@@ -14,7 +14,7 @@ const (
 	OrderEndpoint               = "/api/v5/trade/order"
 	OrderBatchEndpoint          = "/api/v5/trade/batch-orders"
 	ServerTimeEndpoint          = "/api/v5/public/time"
-	CandleRealTimeEndpoint      = "/api/v5/market/index-candles"
+	CandleRealTimeEndpoint      = "/api/v5/market/candles"
 	CandleHistoryEndpoint       = "/api/v5/market/history-index-candles"
 	TickerEndpoint              = "/api/v5/market/index-tickers"
 	OrderBookEndpoint           = "/api/v5/market/books"

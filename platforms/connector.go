@@ -38,12 +38,12 @@ type SpotMarketData interface {
 	// GetOrderBook retrieves the order book for a given symbol.
 	// symbol: Trading pair symbol (e.g., BTCUSDT).
 	// depth: Number of order book entries to retrieve (optional).
-	GetOrderBook(symbol string, depth *int64) (*types.OrderBookEntry, error)
+	GetOrderBook(symbol string, depth *int64) (types.OrderBookEntry, error)
 	// GetCandles retrieves candlestick data (OHLCV) for a given symbol and interval.
 	// symbol: Trading pair symbol (e.g., BTCUSDT).
 	// interval: Time interval for the candles (e.g., 1m, 5m, 1h, 1d).
 	// limit: Maximum number of candles to retrieve.
-	GetCandles(symbol, interval string, limit int64) ([]types.CandleEntry, error)
+	GetCandles(symbol, interval string, limit int64) (types.CandlesEntry, error)
 	// GetServerTime retrieves the server time of the exchange.
 	GetServerTime() (int64, error)
 	// GetTicker retrieves the ticker information for a given symbol.

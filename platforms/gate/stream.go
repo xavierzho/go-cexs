@@ -122,15 +122,17 @@ func (m *MarketStream) CandleStream(ctx context.Context, symbol, interval string
 				if err != nil {
 					continue
 				}
-				channel <- types.CandleEntry{
-					"open_time": event.Result.T,
-					"open":      event.Result.O,
-					"high":      event.Result.H,
-					"low":       event.Result.L,
-					"close":     event.Result.C,
-					"volume":    event.Result.V,
-					"is_close":  event.Result.W,
+				k := event.Result
+				list := []any{k.T, k.O, k.H, k.L, k.C, k.V, k.A}
+				candle := make([]float64, len(list))
+				for i, a := range list {
+					v := types.Safe2Float(a)
+					if i == 0 {
+						v *= 1000
+					}
+					candle[i] = v
 				}
+				channel <- candle
 
 			}
 		}

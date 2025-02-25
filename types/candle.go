@@ -1,30 +1,39 @@
 package types
 
-// CandleBaseKeys for CandleEntry.FromList keys params
-var CandleBaseKeys = []string{
-	"time_start", "open", "high", "low", "close", "volume",
-}
+import (
+	"strconv"
+)
 
-//	type CandleEntry struct {
-//		O  string // open
-//		H  string // high
-//		L  string // low
-//		C  string // close
-//		V  string // volume
-//		Ts int64  // timestamp start
-//		Te int64  // timestamp end
-//	}
-type CandleEntry map[string]any
+// CandleEntry fields verbose: [start_timestamp, open, high, low, close, volume, (volume_usd)]
+type CandleEntry []float64
 
-func (c *CandleEntry) FromList(data []any, keys []string) {
-	var m = make(map[string]any)
-	if len(data) != len(keys) {
-		return
+// CandlesEntry candle list
+type CandlesEntry []CandleEntry
+
+func Safe2Float(data any) float64 {
+	switch v := data.(type) {
+	case string:
+		f, _ := strconv.ParseFloat(v, 64)
+		return f
+	case float64:
+		return v
+	case float32:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case int32:
+		return float64(v)
+	case int:
+		return float64(v)
+	case uint64:
+		return float64(v)
+	case uint32:
+		return float64(v)
+	case uint:
+		return float64(v)
+	default:
+		return 0
 	}
-	for i, key := range keys {
-		m[key] = data[i]
-	}
-	*c = m
 }
 
 type DepthEntry struct {

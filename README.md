@@ -11,6 +11,17 @@
 - [x] [Gate](https://www.gate.io/docs/developers/apiv4/ws/en/)
 - [ ] etc....
 
+
+# FAQ
 ## symbol, trading_pair format
 All symbol formats are uppercase `{base}{quote}`, The converter is in [symbol.go](constants/symbol.go)
 
+
+## The difference between balance stream and account stream
+| Feature             | Balance Stream                         | Account Stream                      |
+|---------------------|----------------------------------------|-------------------------------------|
+| **Primary Focus**   | Non-transactional fund changes         | Transaction-related asset changes   |
+| **Event Types**     | Deposits, withdrawals, transfers       | Order executions, fee deductions    |
+| **Account Changes** | Direct increase/decrease in balance    | Asset conversion due to trading     |
+| **Typical Scenario**| Transferring funds to futures account  | Buying BTC with USDT                |
+| **Data Source**     | Balance update notifications           | Order update notifications          |

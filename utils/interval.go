@@ -6,9 +6,10 @@ import (
 	"strconv"
 )
 
+var timeRe = regexp.MustCompile(`^(\d+)([smhdHD])$`)
+
 func ToSeconds(interval string) (int64, error) {
-	re := regexp.MustCompile(`^(\d+)([smhdHD])$`)
-	matches := re.FindStringSubmatch(interval)
+	matches := timeRe.FindStringSubmatch(interval)
 	if len(matches) != 3 {
 		return 0, fmt.Errorf("invalid interval format: %s", interval)
 	}

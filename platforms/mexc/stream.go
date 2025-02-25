@@ -18,8 +18,8 @@ type Event interface {
 	GetSymbol() string
 }
 type StreamResp[T Event] struct {
-	Symbol    string `json:"s"`
-	Timestamp string `json:"t"`
+	Symbol    string `json:"s,omitempty"`
+	Timestamp int64  `json:"t"`
 	Operator  string `json:"c"`
 	Data      T      `json:"d"`
 }
@@ -85,10 +85,22 @@ func (stream *MarketStream) DepthStream(ctx context.Context, symbol string, chan
 }
 
 type CandleUpdate struct {
-	Kline Candle `json:"k"`
-	Event string `json:"e"`
+	Symbol     string `json:"symbol"`
+	SymbolId   string `json:"symbolid"`
+	CreateTime int64  `json:"createtime"`
+	Kline      struct {
+		Open     string `json:"openingprice"`
+		Volume   string `json:"volume"`
+		High     string `json:"highestprice"`
+		Amount   string `json:"amount"`
+		Start    int64  `json:"windowstart"`
+		Interval string `json:"interval"`
+		Close    string `json:"closingprice"`
+		End      int64  `json:"windowend"`
+		Low      string `json:"lowestprice"`
+	} `json:"publicspotkline"`
+	Channel string `json:"channel"`
 }
-
 type Candle struct {
 	Volume    string `json:"a"`
 	Close     string `json:"c"`
@@ -101,9 +113,6 @@ type Candle struct {
 	Open      string `json:"o"`
 }
 
-func (d CandleUpdate) GetSymbol() string {
-	return d.Event
-}
 func itl(i string) (string, error) {
 	re := regexp.MustCompile("(\\d+)([mshdwM])")
 	match := re.FindStringSubmatch(i)
@@ -156,18 +165,19 @@ func (stream *MarketStream) CandleStream(ctx context.Context, symbol, interval s
 				if err != nil {
 					continue
 				}
-				var resp StreamResp[CandleUpdate]
+				var resp CandleUpdate
 				_ = utils.Json.Unmarshal(msg, &resp)
-				var kline = resp.Data.Kline
-				channel <- types.CandleEntry{
-					"open":       kline.Open,
-					"high":       kline.High,
-					"low":        kline.Low,
-					"close":      kline.Close,
-					"time_start": kline.TimeStart,
-					"time_end":   kline.TimeEnd,
-					"volume":     kline.Volume,
+				var k = resp.Kline
+				var list = []any{k.Start, k.Open, k.High, k.Low, k.Close, k.Volume, k.Amount}
+				var result = make(types.CandleEntry, len(list))
+				for i, a := range list {
+					v := types.Safe2Float(a)
+					if i == 0 {
+						v *= 1000
+					}
+					result[i] = v
 				}
+				channel <- result
 			}
 		}
 	}()

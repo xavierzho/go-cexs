@@ -120,16 +120,12 @@ func (m *MarketStream) CandleStream(ctx context.Context, symbol, interval string
 				var event PublicStream[CandleEvent]
 				_ = utils.Json.Unmarshal(msg, &event)
 				for _, e := range event.Data {
-					channel <- types.CandleEntry{
-						"open":       e.Open,
-						"high":       e.High,
-						"low":        e.Low,
-						"close":      e.Close,
-						"time_start": e.Start,
-						"time_end":   e.End,
-						"volume":     e.Volume,
+					var list = []any{e.Start, e.Open, e.High, e.Low, e.Close, e.Volume, e.Turnover}
+					var line = make([]float64, len(list))
+					for i, v := range list {
+						line[i] = types.Safe2Float(v)
 					}
-
+					channel <- line
 				}
 			}
 		}

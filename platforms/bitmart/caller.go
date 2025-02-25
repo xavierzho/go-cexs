@@ -63,16 +63,25 @@ func (c *Connector) Call(method string, route string, params platforms.Serialize
 	if err != nil {
 		return err
 	}
-	if authType == constants.Keyed {
+	switch authType {
+	case constants.Keyed:
 		header.Add("X-BM-KEY", c.APIKey)
-	} else {
+	case constants.Signed:
 		header.Add("X-BM-KEY", c.APIKey)
 		header.Add("X-BM-TIMESTAMP", strconv.FormatInt(timestamp.UnixNano(), 10))
 		signature := c.Sign(preSign(timestamp, *c.Option, bodyData.Bytes()))
 		req.Header.Add("X-BM-SIGN", signature)
+	default:
+		header.Add("X-BM-TIMESTAMP", strconv.FormatInt(timestamp.UnixNano(), 10))
+
 	}
 
 	if method == http.MethodGet {
+		query, err := params.EncodeQuery()
+		if err != nil {
+			return err
+		}
+		url = fmt.Sprintf("%s?%s", url, query)
 		req, err = http.NewRequest(http.MethodGet, url, nil)
 	} else if method == http.MethodPost {
 		req.Body = io.NopCloser(body)

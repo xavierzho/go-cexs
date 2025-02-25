@@ -9,7 +9,7 @@ import (
 	"github.com/xavierzho/go-cexs/types"
 )
 
-func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.CandleEntry, error) {
+func (c *Connector) GetCandles(symbol, interval string, limit int64) (types.CandlesEntry, error) {
 	var klines [][]any
 	err := c.Call(http.MethodGet, KlineEndpoint, &platforms.ObjectBody{
 		SymbolFiled: symbol,
@@ -19,16 +19,13 @@ func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.Ca
 	if err != nil {
 		return nil, err
 	}
-	var keys = []string{
-		"time_start", "open", "high", "low", "close", "volume", "time_end",
-		"volume_usd", "trades", "base_buy", "quote_buy", "ignore",
-	}
-	var candles []types.CandleEntry
-	for _, kline := range klines {
-		var candle = make(types.CandleEntry)
-
-		candle.FromList(kline, keys)
-		candles = append(candles, candle)
+	var candles = make(types.CandlesEntry, len(klines))
+	for i, kline := range klines {
+		list := append(kline[:6], kline[7])
+		candles[i] = make([]float64, len(list))
+		for j, v := range list {
+			candles[i][j] = types.Safe2Float(v)
+		}
 	}
 	return candles, nil
 }
@@ -41,7 +38,7 @@ func (c *Connector) GetServerTime() (int64, error) {
 	return resp.ServerTime, err
 }
 
-func (c *Connector) GetOrderBook(symbol string, depth *int64) (*types.OrderBookEntry, error) {
+func (c *Connector) GetOrderBook(symbol string, depth *int64) (types.OrderBookEntry, error) {
 	var limit int64 = 30
 	if depth != nil {
 		limit = *depth
@@ -55,13 +52,15 @@ func (c *Connector) GetOrderBook(symbol string, depth *int64) (*types.OrderBookE
 		SymbolFiled: symbol,
 		"limit":     limit,
 	}, constants.None, orderBook)
-
-	return &types.OrderBookEntry{
+	if err != nil {
+		return types.OrderBookEntry{}, err
+	}
+	return types.OrderBookEntry{
 		Symbol:    symbol,
 		Bids:      orderBook.Bids,
 		Asks:      orderBook.Asks,
 		Timestamp: orderBook.LastUpdateId,
-	}, err
+	}, nil
 }
 
 func (c *Connector) GetTicker(symbol string) (types.TickerEntry, error) {

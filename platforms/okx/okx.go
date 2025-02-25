@@ -21,6 +21,9 @@ func (c *Connector) SymbolPattern(symbol string) string {
 }
 
 func NewConnector(cred *platforms.Credentials, client *http.Client) platforms.SpotConnector {
+	if client == nil {
+		client = http.DefaultClient
+	}
 	return &Connector{Credentials: cred, Client: client}
 }
 

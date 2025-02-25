@@ -30,7 +30,7 @@ func (OrderBook) String() string {
 	return ""
 }
 
-func (c *Connector) GetOrderBook(symbol string, depth *int64) (*types.OrderBookEntry, error) {
+func (c *Connector) GetOrderBook(symbol string, depth *int64) (types.OrderBookEntry, error) {
 	var resp RestResp[OrderBook, NullExt]
 	if depth == nil {
 		*depth = 30
@@ -41,9 +41,9 @@ func (c *Connector) GetOrderBook(symbol string, depth *int64) (*types.OrderBookE
 		"limit":    *depth,
 	}, constants.None, &resp)
 	if err != nil {
-		return nil, err
+		return types.OrderBookEntry{}, err
 	}
-	return &types.OrderBookEntry{
+	return types.OrderBookEntry{
 		Symbol:    resp.Result.Symbol,
 		Asks:      resp.Result.Asks,
 		Bids:      resp.Result.Bids,
@@ -60,7 +60,7 @@ type Candle struct {
 func (Candle) String() string {
 	return ""
 }
-func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.CandleEntry, error) {
+func (c *Connector) GetCandles(symbol, interval string, limit int64) (types.CandlesEntry, error) {
 	var ret RestResp[Candle, NullExt]
 	err := c.Call(http.MethodGet, CandleEndpoint, &platforms.ObjectBody{
 		"category": "spot",
@@ -71,14 +71,12 @@ func (c *Connector) GetCandles(symbol, interval string, limit int64) ([]types.Ca
 	if err != nil {
 		return nil, err
 	}
-	var keys = []string{
-		"time_start", "open", "high", "low", "close", "volume", "turnover",
-	}
-	var result []types.CandleEntry
-	for _, kline := range ret.Result.List {
-		var candle = new(types.CandleEntry)
-		candle.FromList(kline, keys)
-		result = append(result, *candle)
+	var result = make(types.CandlesEntry, len(ret.Result.List))
+	for i, kline := range ret.Result.List {
+		result[i] = make([]float64, len(kline))
+		for j, v := range kline {
+			result[i][j] = types.Safe2Float(v)
+		}
 	}
 	return result, nil
 }
